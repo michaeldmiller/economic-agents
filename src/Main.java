@@ -477,6 +477,7 @@ class Price{
     }
 }
 
+
 class Market {
     private ArrayList<Agent> agents;
     private ArrayList<Item> inventory;
