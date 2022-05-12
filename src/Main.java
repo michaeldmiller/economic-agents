@@ -1,4 +1,5 @@
 import java.util.*;
+import java.lang.Thread;
 
 public class Main {
     /*
@@ -165,7 +166,105 @@ public class Main {
     it opens, but hopefully I have enough pieces in the right places to get started.
      */
 
-    public static void main(String[] args){
+    // randomizer functions, designed in a previous project:
+    static String randomPick(ArrayList<String> lst){
+        // given a list of strings, return a random choice from the list
+        // does not modify the list or prevent duplicate picks
+        int listLength = lst.size();
+        int choiceNumber = (int) (Math.random() * listLength);
+        return lst.get(choiceNumber);
+    }
+
+    static String randomWeightedPick(ArrayList<String> choices, ArrayList<Integer> weights){
+        // ArrayList<String>, ArrayList<Integer> -> String
+        // given a list of choices, and a list of integer weights of the same list length
+        // whose values correspond to the weights of the choices, make a weighted randomized
+        // choice among the possible choices
+        // eg for a list "A", "B" of the choices and a list 80, 20 of the weights, "A" is
+        // chosen on average 80% of the time and "B" is chosen 20% of the time.
+        // FUNCTION DOES NOT WORK IF CHOICE AND WEIGHT LIST ARE OF DIFFERENT LENGTHS
+
+        // unpack choices and weights into list of choice-weights
+        // set running total and choice-weight accumulators
+        int weightTotal = 0;
+        ArrayList<ChoiceWeight> weightedList = new ArrayList<ChoiceWeight>();
+
+        // main loop
+        for (int i = 0; i < choices.size(); i++){
+            String choice = choices.get(i);
+            int weight = weights.get(i);
+            weightTotal = weightTotal + weight;
+            weightedList.add(new ChoiceWeight(choice, weightTotal));
+        }
+        // System.out.println(weightedList);
+        // now, using combined weight total, select an individual weight unit within it
+        int unitSelection = (int) (Math.random() * weightTotal);
+        // System.out.println(weightTotal);
+        // System.out.println(unitSelection);
+
+        // search list of choice-weight pairs, return the choice whose weight unit was selected
+        String output = "";
+        for (int j = 0; j < weightedList.size(); j++){
+            if (weightedList.get(j).getWeight() >= unitSelection){
+                output = weightedList.get(j).getChoice();
+                break;
+            }
+        }
+        return output;
+    }
+
+    // First Method: Produce
+    // Given an Agent and a Market, have the agent produce a good according to its Job, deliver
+    // the good to the market, and be compensated accordingly.
+    // Breaks if the agent is not initialized with a job that is in the market's job output list!
+    static void agentProduce (Agent agent, Market market){
+        // first determine what goods are going to be produced
+        String goodType = "";
+        for (JobOutput j : market.getJobOutputs()) {
+            if (j.getJob().equals(agent.getProfession().getJob())) {
+                goodType = j.getGood();
+                break;
+            }
+        }
+        // then have the Agent produce the Good (literally produces the amount of their skill level)
+        Item agentProduction = new Item (goodType, agent.getProfession().getSkillLevel());
+        // compensate the Agent first (don't want agent's production to affect market price before the market has it)
+        // find market price
+        double currentPrice = 0;
+        for (Price p : market.getPrices()){
+            if (p.getGood().equals(agentProduction.getGood())){
+                currentPrice = p.getCost();
+                break;
+            }
+        }
+        // pay Agent
+        agent.setMoney(agent.getMoney() + ((agentProduction.getQuantity()) * currentPrice));
+        // deliver Good to Market
+        for (Item i : market.getInventory()){
+            if (i.getGood().equals(agentProduction.getGood())){
+                i.setQuantity(i.getQuantity() + agentProduction.getQuantity());
+            }
+        }
+    }
+
+    // apply Agent production to the Market
+    static void marketProduce (Market m){
+        for (Agent a : m.getAgents()){
+            agentProduce(a, m);
+        }
+    }
+
+    // master controller function
+    static void runMarket (Market market) throws InterruptedException {
+        marketProduce(market);
+        System.out.println(market);
+        Thread.sleep(1000);
+
+    }
+
+
+
+    public static void main(String[] args) throws InterruptedException {
         // Create a test Market, to ensure that classes have been created correctly.
         // In principle, I intend to test this system on a Market with 10 Agents and 2 Goods,
         // Fish and Lumber, respectively.
@@ -218,11 +317,38 @@ public class Main {
         ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
         Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices);
 
-        // print all
-        System.out.println(market);
+        // run market
+        while (true){
+            runMarket(market);
+        }
+
 
     }
 }
+
+class ChoiceWeight {
+    String choice;
+    int weight;
+
+    public ChoiceWeight(String choice, int weight){
+        this.choice = choice;
+        this.weight = weight;
+    }
+
+    public String getChoice(){
+        return choice;
+    }
+
+    public int getWeight(){
+        return weight;
+    }
+
+    public String toString() {
+        return (this.getChoice() + "-" +
+                this.getWeight());
+    }
+}
+
 // First, define the classes needed for an Agent:
 // An Inventory is an ArrayList of Item
 class Item {
