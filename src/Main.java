@@ -133,7 +133,7 @@ public class Main {
     A Market is a Class containing:
     - An ArrayList of Agents
     - An Inventory
-    - An ArrayList of JobTypes
+    - An ArrayList of JobOutputs
     - An ArrayList of Prices
 
     The ArrayList of Agents is fairly self-explanatory: A Market is just a thing to facilitate their interaction.
@@ -141,14 +141,21 @@ public class Main {
     the amount of goods available for sale at any given time. Since all Agent interactions are with the Market, not
     each other, the Market needs to be able to store Goods in the time between when each Agent produces according
     to its Profession and consumes to increase its Satisfaction.
-    JobType has not yet been defined. A JobType is a simple Class containing a Job and a Good. The ArrayList can
+    JobOutput has not yet been defined. A JobOutput is a simple Class containing a Job and a Good. The ArrayList can
     be queried by Agents to determine what Good they are supposed to produce based on their Job.
     Finally, the ArrayList of Prices, the global Price List, essentially, is the last critical component. It is a list
     of Prices, a class which contains several attributes. Good has been discussed before and is self-explanatory.
     It also contains Cost, which is a Number. This represents the current market price of any particular Good.
-    Finally, it contains a BaseCost, which is the externally specified original "correct" price of a Good. I have
-    not fleshed out the details, but intend to add special behaviors if the Cost of a Good is a certain factor above
-    or below its BaseCost, perhaps affecting the Modifier attribute of Agents' Priorities.
+    Finally, it contains a equilibriumCost, which is the equilibrium/"correct" price of a Good. I have not yet
+    fleshed out the details, but intend to add special behaviors if the Cost of a Good is a certain factor above
+    or below its equilibriumCost, perhaps affecting the Modifier attribute of Agents' Priorities.
+
+    Note: also added an unchanging list of original prices through a final variable OriginalCost in a given price.
+     This will enable events to change the equilibriumCost of a good, shifting equilibrium rather than simply disturbing
+    the market. Without the OriginalCost, there is no mechanism for the baseCost to be reset to its original value.
+    This enables direct manipulation of prices. The other method is to have off-map high-demand Agent(s), an event increasing
+    or decreasing demand would involve changing the demand of off-map Agent(s) and letting the market equilibrium change
+    accordingly. Tests will be needed to see which approach works better.
 
     This covers the proposed data definitions for the Economic Agents and their Market. Next up is implementing the
     definitions, then setting up functions to facilitate the interactions.
@@ -159,19 +166,64 @@ public class Main {
      */
 
     public static void main(String[] args){
-        System.out.println("Economic Agents");
+        // Create a test Market, to ensure that classes have been created correctly.
+        // In principle, I intend to test this system on a Market with 10 Agents and 2 Goods,
+        // Fish and Lumber, respectively.
+
+        // Agent Needs:
+        // a Priorities default for Fishermen and Lumberjack Agents and a Consumptions default for each type.
+        // A Profession and skill level for each (will set SkillLevel to 1 for now)
+        // Basic defaults: generation of ID String ("1" - "10"), empty inventory, 10 money to start, 0 satisfaction
+        // 8 Fishermen, 2 Lumberjacks to start, equilibrium 7 Fishermen, 3 Lumberjacks
+
+        // Market Needs:
+        // compile agents 1-10 into an ArrayList, basic empty default inventory
+        // ArrayList of JobTypes: Fisherman -> Fish, Lumberjack -> Lumber
+        // ArrayList of Prices: (Fish, 1.5, 2, 2); (Lumber 3.5, 3, 3) <- Fish oversupplied, in testing try to get
+        //      an agent to switch professions so the price returns to equilibrium.
+
+        ArrayList<Item> inventoryFish = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryLumber = new ArrayList<Item>(List.of (new Item("Fish", 1.0),
+                new Item("Lumber", 3.0)));
+        ArrayList<Item> inventoryMarket = new ArrayList<Item>(List.of (new Item("Fish", 10.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.35),
+                new Item("Lumber", 0.15))); //<-- 7:3 consumption rate, should force equilibrium
+        // no SkillLevel code implemented, setting all to 1
+        Profession fisherman = new Profession("Fisherman", 1.0);
+        Profession lumberjack = new Profession("Lumberjack", 1.0);
+        // All Agents have the same priorities
+        ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 7.0, 1, 1, 7.0),
+                new Priority("Lumber", 3.0, 1, 1, 7.0)));
+        ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
+                new JobOutput("Lumberjack", "Lumber")));
+        ArrayList<Price> marketPrices = new ArrayList<Price>(List.of(
+                new Price("Fish", 1.5, 2, 2),
+                new Price("Lumber", 3.5, 3, 3)));
+        // Define Agents
+        Agent a1 = new Agent("1", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a2 = new Agent("2", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a3 = new Agent("3", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a4 = new Agent("4", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a5 = new Agent("5", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a6 = new Agent("6", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a7 = new Agent("7", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a8 = new Agent("8", inventoryFish, priorities, consumption, fisherman, 0, 0);
+        Agent a9 = new Agent("9", inventoryLumber, priorities, consumption, lumberjack, 0, 0);
+        Agent a10 = new Agent("10", inventoryLumber, priorities, consumption, lumberjack, 0, 0);
+
+        // Lastly, define Market
+        ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
+        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices);
+
+        // print all
+        System.out.println(market);
+
     }
 }
-/*
-An 'Inventory' is another class. It consists of an ArrayList of Items.
-    An Item isn't built-in either. It consists of a Good and a Quantity.
-    A Good is a String from a specific, global ArrayList of Strings, e.g. "Fish" or "Lumber" or whatever.
-    A Quantity is just a Number. Based on how I want to do this, I do not think it has to be just an Integer, at least
-    at the Market level. Currently, I feel as though it is important for manageability for an Agent to only be able
-    to buy one value of a Good, preferably one, but the production model I have in mind would produce a wide variety
-    of values. I will have to see how that shakes out.
- */
-
+// First, define the classes needed for an Agent:
 // An Inventory is an ArrayList of Item
 class Item {
     // Variable Instantiation
@@ -201,25 +253,6 @@ class Item {
         return(this.getGood() + ", " + this.getQuantity());
     }
 }
-
-/*
-A 'Priorities' is similar to an Inventory, containing an ArrayList of Priority.
-    A Priority is similar to an Item, also containing a Good, but it contains several other numbers:
-    a Weight is the most relevant number, used in the final calculation, reflecting the per-unit Satisfaction
-    the Agent would derive from that good. More numbers are needed to calculate this Weight.
-    A BaseWeight is a Number, the base, unmodified per-unit Satisfaction derived from a particular Good.
-    An Elasticity is also a Number, reflecting how an Agent will respond to change in the prices for that Good.
-    i.e. an Agent would be relatively inelastic to price changes in food, paying whatever it takes, but relatively
-    price elastic for a luxury item like fancy clothes.
-    A RelativeNeed is another Number. Elasticity should be a constant value for a given Agent, reflecting their
-    consumption habits and the nature of a Good. However, I also want personal scarcity to impact Weight: i.e. running
-    out of a Good should motivate the Agent to purchase said Good. i.e. if the Agent was running low on food, it would
-    be far more heavily motivated to buy food than it would be under normal circumstances, regardless of the current
-    price of food (that is covered by regular elasticity)
-    A Modifier is yet another Number, a placeholder for now. I anticipate needing it later to handle events at the
-    least, although I suspect there is another aspect of demand calculation I am forgetting, and I want to have
-    a slot for it when I figure out what it is.
-*/
 
 // A 'Priorities' is an ArrayList of Priority
 class Priority{
@@ -267,33 +300,16 @@ class Priority{
         weight = newWeight;
     }
     public String toString(){
-        return (this.getGood() + "\n" +
-                "Base weight of: " + this.getBaseWeight() + ", " +
-                "relative need of: " + this.getRelativeNeed() + ", " +
-                "modifier of: " + this.getModifier() + ", " +
-                "final weight of: " + this.getWeight() + ".");
+        return ("\n" + this.getGood() + ": " +
+                "base weight: " + this.getBaseWeight() + ", " +
+                "relative need: " + this.getRelativeNeed() + ", " +
+                "modifier: " + this.getModifier() + ", " +
+                "final weight: " + this.getWeight() + ".");
     }
 }
 
 // A 'Consumptions' is an Inventory
 
-/*
-A 'Professions' is much different from the previous three.
-    A Professions consists of a Job and a SkillLevel.
-    A Job is a String, selected from a global ArrayList of Strings, like "Fisherman" or "Lumberjack" or whatever.
-    each Job corresponds to one of those globally defined professions. I am not sure about the performance implications
-    of this, but I do not want to store the output good individually, as I would like Agents to be able to switch
-    professions easily (this is how I intend for supply to change in markets with supply levels below equilibrium:
-    price goes up and Agents, based on their current Profession [Job and SkillLevel], may choose to switch to working
-    in the in demand Job at the lower SkillLevel, calculating their current and expected income, then if the condition
-    is met, roll to see if they actually change. Willingness to change professions will need to be dialed in through
-    testing.)
-    A SkillLevel is a Number. Useful in the context above, it goes up over time as an Agent adjusts to working
-    in their Job. i.e. a master fisherman is going to catch/produce more fish than a total novice. This factor
-    determines how much of its specified Good an Agent produces in a given tick, and serves as a disincentive to
-    switching Jobs, beyond the global willingness to change modifier.
-
- */
 class Profession {
     private String job;
     private double skillLevel;
@@ -320,48 +336,6 @@ class Profession {
                 this.getSkillLevel());
     }
 }
-
-/*
-The base unit of this market simulation is the Agent. It is important to discuss what an Agent is.
-    An Agent is a Class, obviously, this is Java. At the outset, I anticipate an Agent will need the following
-    attributes to function properly in the Market:
-    - ID
-    - Inventory
-    - Priorities
-    - Consumption
-    - Profession
-    - Money
-    - Satisfaction
-    Aside from the ID, which is largely there for administrative purposes, all of these attributes play off one another
-    to generate economic behaviors.
-    In concept, I propose that in each tick of the market, each agent takes the following actions:
-    based on its Profession, it produces a certain number of Goods, which are then sold into the Market (which has
-    its own Inventory). Based on the current Price of the Good, the Agent then receives an Amount of Money for its
-    Goods (goods may be services in this context, "economic output" somehow seems like a worse name, even if it is
-    a bit more descriptive.)  Based on the amount of Money it has, and its Priorities, the Agent calculates the purchase
-    (or lack thereof), which would increase its Satisfaction the most. This calculation is deceptively complex.
-    Priorities, which would be refreshed prior to the calculation, would weigh the per tick Consumptions of the Agent,
-    the per-unit Satisfaction gain from each Good, against the available Money resources to determine what action
-    would increase its Satisfaction the most. This allows the opportunity for scarcity to affect demand: an Agent
-    which is running low on something it consumes will derive more Satisfaction from making sure its consumption
-    of that Good can continue, than of purchasing some normal good. Since scarcity changes the per-unit Weight in the
-    Priority of the Good, it will be willing to pay more. The elasticity of this response to scarcity is an important,
-    but advanced feature, which, being unique to each Agent must also be stored in the Priorities of each Agent for
-    appropriate calculation. With all of this determined, the Agent makes a weighted random choice. I feel this step is
-    very essential: in real life people do not always make the most rational economic choice at all times, doing
-    so in simulation would trend the simulation towards reflecting a perfect equilibrium which arises from pure
-    economic rationality. As this is unrealistic, the Agent will use the result of the calculations to weight its
-    possible actions, generally picking the most rational choice, but not always. Once the agent makes its choice,
-    it then buys the Good from the Market, removing a unit of that Good from the Market's Inventory, and deducting
-    an appropriate amount of Money from the Agent's Inventory.
-
-    An ID is a String. Plain and simple.
-    A 'Money' is a Number, literally just the amount of money currently in the Agent's possession. While a simple
-    attribute, it affects many other things.
-    A 'Satisfaction' is a Number. It represents the current Satisfaction of an Agent. I might use this in aggregate to
-    determine the move of a market towards or away from equilibrium over time. Its primary use, however, is as
-    discussed above: as the metric by which an Agent makes its purchasing decisions.
- */
 
 class Agent {
     private String id;
@@ -426,22 +400,16 @@ class Agent {
         satisfaction = newSatisfaction;
     }
     public String toString(){
-        return ("ID: " + this.getId() + ",\n" +
+        return ("\n\n" + "ID: " + this.getId() + ",\n" +
                 "Inventory: " + this.getInventory() + ",\n" +
                 "Priorities: " + this.getPriorities() + ",\n" +
                 "Consumption: " + this.getConsumption() + ",\n" +
                 "Profession: " + this.getProfession() + ",\n" +
                 "Money: " + this.getMoney() + ",\n" +
-                "Satisfaction: " + this.getSatisfaction() + ".\n");
+                "Satisfaction: " + this.getSatisfaction() + ".");
     }
 }
 // Next up is defining the Market, for the Agents to interact.
-
-/*
-JobOutput has not yet been defined. A JobOutput is a simple Class containing a Job and a Good. The ArrayList can
-    be queried by Agents to determine what Good they are supposed to produce based on their Job.
- */
-
 class JobOutput{
     private String job;
     private String good;
@@ -463,25 +431,9 @@ class JobOutput{
         good = newGood;
     }
     public String toString(){
-        return (this.getJob() + " -> " + this.getGood());
+        return ("\n" + this.getJob() + " -> " + this.getGood());
     }
 }
-/*
-Finally, the ArrayList of Prices, the global Price List, essentially, is the last critical component. It is a list
-    of Prices, a class which contains several attributes. Good has been discussed before and is self-explanatory.
-    It also contains Cost, which is a Number. This represents the current market price of any particular Good.
-    Finally, it contains a equilibriumCost, which is the equilibrium/"correct" price of a Good. I have not yet
-    fleshed out the details, but intend to add special behaviors if the Cost of a Good is a certain factor above
-    or below its equilibriumCost, perhaps affecting the Modifier attribute of Agents' Priorities.
-
-    Note: also added an unchanging list of original prices through a final variable OriginalCost in a given price.
-     This will enable events to change the equilibriumCost of a good, shifting equilibrium rather than simply disturbing
-    the market. Without the OriginalCost, there is no mechanism for the baseCost to be reset to its original value.
-    This enables direct manipulation of prices. The other method is to have off-map high-demand Agent(s), an event increasing
-    or decreasing demand would involve changing the demand of off-map Agent(s) and letting the market equilibrium change
-    accordingly. Tests will be needed to see which approach works better.
-
- */
 
 class Price{
     private String good;
@@ -517,23 +469,14 @@ class Price{
     public void setEquilibriumCost(double newEquilibriumCost){
         equilibriumCost = newEquilibriumCost;
     }
+    public String toString(){
+        return ("\n" + this.getGood() + ", " +
+                "Cost: " + this.getCost() + ", " +
+                "Equilibrium Cost: " + this.getEquilibriumCost() + ", " +
+                "Original Cost: " + this.getEquilibriumCost());
+    }
 }
 
-/*
-Agents are not the only components of a Market. A Market is defined as follows:
-    A Market is a Class containing:
-    - An ArrayList of Agents
-    - An Inventory
-    - An ArrayList of JobOutput
-    - An ArrayList of Prices
-
-    The ArrayList of Agents is fairly self-explanatory: A Market is just a thing to facilitate their interaction.
-    The Inventory is a bit more interesting. The Market has an inventory just like each of its Agents, representing
-    the amount of goods available for sale at any given time. Since all Agent interactions are with the Market, not
-    each other, the Market needs to be able to store Goods in the time between when each Agent produces according
-    to its Profession and consumes to increase its Satisfaction.
-
-*/
 class Market {
     private ArrayList<Agent> agents;
     private ArrayList<Item> inventory;
@@ -572,11 +515,9 @@ class Market {
         prices = newPrices;
     }
     public String toString(){
-        return ("This market has the following agents: " + this.getAgents() + "\n" +
+        return ("This market has the following agents: \n" + this.getAgents() + "\n" +
                 "The market inventory is: " + this.getInventory() + "\n" +
                 "It permits the following job->output combinations: " + this.getJobOutputs() + "\n" +
                 "The market has these prices: " + this.getPrices() + ".");
     }
 }
-
-
