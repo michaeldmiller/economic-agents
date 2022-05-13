@@ -254,17 +254,34 @@ public class Main {
         }
     }
 
-    // have the Agents consume goods according to their consumption profile. In this extremely early version,
-    // this simply subtracts the good from the inventory according to the consumption profile, does /not/ check
-    // for negatives or impact market price
+    // have the Agents consume goods according to their consumption profile.
     // *this interpretation REQUIRES that inventory and consumption have the same goods in the same order*
     // (^ helps performance)
+    // an Agent running out of a good significantly increases its relative need for it, having that good again resets
+    // the relative need
 
     static void agentConsume (Agent a, Market m){
         for (int i = 0; (i < a.getConsumption().size()); i++ ){
             Item newItem = new Item(a.getInventory().get(i).getGood(),
                     (a.getInventory().get(i).getQuantity() - a.getConsumption().get(i).getQuantity()));
+            // now protect against negatives and set relative need
+            if (newItem.getQuantity() <= 0){
+                newItem.setQuantity(0);
+                for (Priority p : a.getPriorities()){
+                    if (p.getGood().equals(newItem.getGood())){
+                        p.setRelativeNeed(p.getRelativeNeed() * 1.5);
+                    }
+                }
+            }
             a.getInventory().set(i, newItem);
+            // reset relative need if agent has successfully acquired a sufficient amount of the good
+            if (a.getInventory().get(i).getQuantity() >= 1){
+                for (Priority p : a.getPriorities()){
+                    if (p.getGood().equals(newItem.getGood())){
+                        p.setRelativeNeed(1.0);
+                    }
+                }
+            }
 
         }
     }
@@ -306,7 +323,7 @@ public class Main {
 
         ArrayList<Item> inventoryFish = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
                 new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryLumber = new ArrayList<Item>(List.of (new Item("Fish", 1.0),
+        ArrayList<Item> inventoryLumber = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
                 new Item("Lumber", 3.0)));
         ArrayList<Item> inventoryMarket = new ArrayList<Item>(List.of (new Item("Fish", 10.0),
                 new Item("Lumber", 2.0)));
@@ -349,11 +366,19 @@ public class Main {
         }
          */
 
-        for (int i = 0; i < 100; i++){
+        for (int i = 0; i < 10; i++){
+            agentProduce(a1, market);
             agentConsume(a1, market);
-            System.out.println(a1.getInventory());
+            System.out.println(a1);
         }
-
+        // Agents are initialized incorrectly! inventoryFish is a common object, shared amongst each fisherman
+        System.out.println("Change inventory");
+        a1.setInventory(inventoryLumber);
+        for (int i = 0; i < 5; i++){
+            agentProduce(a1, market);
+            agentConsume(a1, market);
+            System.out.println(a1);
+        }
 
     }
 }
