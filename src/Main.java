@@ -254,6 +254,29 @@ public class Main {
         }
     }
 
+    // have the Agents consume goods according to their consumption profile. In this extremely early version,
+    // this simply subtracts the good from the inventory according to the consumption profile, does /not/ check
+    // for negatives or impact market price
+    // *this interpretation REQUIRES that inventory and consumption have the same goods in the same order*
+    // (^ helps performance)
+
+    static void agentConsume (Agent a, Market m){
+        for (int i = 0; (i < a.getConsumption().size()); i++ ){
+            Item newItem = new Item(a.getInventory().get(i).getGood(),
+                    (a.getInventory().get(i).getQuantity() - a.getConsumption().get(i).getQuantity()));
+            a.getInventory().set(i, newItem);
+
+        }
+    }
+    /*
+    // apply Agent production to the Market
+    static void marketProduce (Market m){
+        for (Agent a : m.getAgents()){
+            agentProduce(a, m);
+        }
+    }
+    */
+
     // master controller function
     static void runMarket (Market market) throws InterruptedException {
         marketProduce(market);
@@ -318,8 +341,17 @@ public class Main {
         Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices);
 
         // run market
+        System.out.println(a1.getInventory());
+        /*
         while (true){
-            runMarket(market);
+            // runMarket(market);
+            // Thread.sleep(1000);
+        }
+         */
+
+        for (int i = 0; i < 100; i++){
+            agentConsume(a1, market);
+            System.out.println(a1.getInventory());
         }
 
 
