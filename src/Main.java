@@ -352,6 +352,12 @@ public class Main {
         // start loop to pick a good to purchase
         // Only and always purchases 1 unit of a good!
         while (notPurchased) {
+            // if Agent is too poor to buy anything, purchase nothing
+            if (goods.size() == 0){
+                break;
+            }
+
+
             // make choice
             String chosenGood = randomWeightedPick(goods, satisfactions);
             // look up Good price
@@ -362,6 +368,8 @@ public class Main {
                     break;
                 }
             }
+            // System.out.println("Chosen Good: " + chosenGood);
+            // System.out.println("Chosen Good's Price : " + chosenGoodPrice);
             // See if Agent can't afford to buy its chosen good
             if (a.getMoney() < chosenGoodPrice) {
                 // find index of good
@@ -383,14 +391,17 @@ public class Main {
                     availableQuantity = i.getQuantity();
                 }
             }
+            // System.out.println("Available quantity: " + availableQuantity);
             if (availableQuantity < 1) {
                 // find index of good
                 int index = 0;
                 for (int i = 0; i < goods.size(); i++) {
                     if (goods.get(i).equals(chosenGood)) {
-                        index = i;
+                        index = i - 1;
                     }
                 }
+                // System.out.println(index);
+                // System.out.println(goods.get(index));
                 // remove good from goods and satisfactions list
                 goods.remove(index);
                 satisfactions.remove(index);
@@ -411,6 +422,7 @@ public class Main {
             for (int i = 0; i < goods.size(); i++){
                 if (goods.get(i).equals(chosenGood)) {
                     index = i;
+                    break;
                 }
             }
             if (satisfactions.get(index) < holdMoneySatisfaction){
@@ -424,17 +436,21 @@ public class Main {
             a.setMoney(a.getMoney() - chosenGoodPrice);
             // remove good from Market's inventory:
             for (Item i : m.getInventory()){
+                System.out.println("removing from inventory");
                 if (i.getGood().equals(chosenGood)){
-                    i.setQuantity(i.getQuantity() +-1);
+                    i.setQuantity(i.getQuantity() - 1);
+                    break;
                 }
             }
             // add good to Agent's inventory
             for (Item t : a.getInventory()){
                 if (t.getGood().equals(chosenGood)) {
                     t.setQuantity(t.getQuantity() + 1);
+                    break;
                 }
             }
             notPurchased = false;
+            break;
             }
         }
 
@@ -456,7 +472,7 @@ public class Main {
         // temporary, provide upper unadjusted bound to market
         for (Item i : market.getInventory()){
             // 10 to be adjusted to 5 times per tick production of a good
-            if (i.getQuantity() > 10){
+            if (i.getQuantity() > 50){
                 for (Price p : market.getPrices()){
                     if (p.getGood().equals(i.getGood())){
                         // reduce cost by 5% of equilibrium cost
@@ -472,9 +488,15 @@ public class Main {
                 c.setCost(c.getCost() + 0.1);
             }
         }
+        // print a specific Agent
+        for (Agent a : market.getAgents()){
+            if (a.getId().equals("1")){
+                System.out.println(a);
+            }
+        }
 
-        System.out.println(market);
-        Thread.sleep(1000);
+        // System.out.println(market);
+        Thread.sleep(200);
 
     }
 
@@ -595,13 +617,13 @@ public class Main {
 
         // run market
         System.out.println(a1.getInventory());
-        /*
-        while (true){
-            // runMarket(market);
-            // Thread.sleep(1000);
-        }
-         */
 
+        while (true){
+            runMarket(market);
+            Thread.sleep(1000);
+        }
+
+        /*
         for (int i = 0; i < 10; i++){
             agentProduce(a1, market);
             agentConsume(a1, market);
@@ -615,6 +637,8 @@ public class Main {
             agentConsume(a1, market);
             System.out.println(a1);
         }
+
+         */
 
     }
 }
