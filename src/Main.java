@@ -237,14 +237,21 @@ public class Main {
                 break;
             }
         }
-        // pay Agent
-        agent.setMoney(agent.getMoney() + ((agentProduction.getQuantity()) * currentPrice));
-        // deliver Good to Market
-        for (Item i : market.getInventory()){
-            if (i.getGood().equals(agentProduction.getGood())){
-                i.setQuantity(i.getQuantity() + agentProduction.getQuantity());
+        // pay Agent if Market has money
+        if (market.getMoney() > ((agentProduction.getQuantity()) * currentPrice)){
+            market.setMoney(market.getMoney() - ((agentProduction.getQuantity()) * currentPrice));
+            agent.setMoney(agent.getMoney() + ((agentProduction.getQuantity()) * currentPrice));
+            // deliver Good to Market
+            for (Item i : market.getInventory()){
+                if (i.getGood().equals(agentProduction.getGood())){
+                    i.setQuantity(i.getQuantity() + agentProduction.getQuantity());
+                }
             }
         }
+        // Note: Agent does not produce if Market cannot pay!
+
+
+
     }
 
     // apply Agent production to the Market
@@ -472,6 +479,7 @@ public class Main {
             // value from the purchase, complete the transaction
             // deduct from Agent's money:
             a.setMoney(a.getMoney() - chosenGoodPrice);
+            m.setMoney(m.getMoney() + chosenGoodPrice);
             // remove good from Market's inventory:
             for (Item i : m.getInventory()){
                 // System.out.println("removing from inventory");
@@ -487,6 +495,36 @@ public class Main {
                     break;
                 }
             }
+            // To Do : Fix Pricing!!!
+            // Problem: Agent can sell and not buy
+            // This creates money out of thin air and oversupply on the market
+            // If we need a perfectly closed system, keep track of buying and selling choices and
+            // only reward an Agent with money if it buys.
+            // If we want a partially closed system, we need to keep track of how much money the market has,
+            // Agents are paid out of the market's money supply
+            /*
+            // alter price!
+            // determine weight of the agent
+            double agentImportance = 1.0 / m.getAgents().size();
+            // increase price by agentImportance * equilibriumPrice
+            for (Price c : m.getPrices())
+                if (c.getGood().equals(chosenGood)) {
+                    c.setCost(c.getCost() + (Math.abs (agentImportance * 0.1 * c.getOriginalCost())));
+                }
+
+            */
+            for (Item marketItem : m.getInventory()){
+                // crude version of production
+                if (marketItem.getQuantity() > (10 * m.getAgents().size())) {
+                    for (Price r : m.getPrices()){
+                        if (r.getGood().equals(marketItem.getGood())){
+                            r.setCost(0.99 * r.getCost());
+                        }
+                    }
+                }
+            }
+
+
             notPurchased = false;
             break;
             }
@@ -554,6 +592,14 @@ public class Main {
         System.out.println(jobsTotal);
     }
 
+    static void printMoney (Market market){
+        double totalMoney = market.getMoney();
+        for (Agent a : market.getAgents()){
+            totalMoney = totalMoney + a.getMoney();
+        }
+        System.out.println(totalMoney);
+    }
+
 
     // master controller function
     static void runMarket (Market market, int counter) throws InterruptedException {
@@ -593,9 +639,9 @@ public class Main {
             }
             */
             // temporary interpretation: set market equilibrium
-            if (counter % 74 == 0){
+            if (counter % 221 == 0){
                 // set equilibrium cost to average of original cost and cost
-                c.setEquilibriumCost((c.getCost() + c.getOriginalCost()) / 2);
+                c.setEquilibriumCost(c.getCost());
             }
         }
 
@@ -715,20 +761,20 @@ public class Main {
                 new Price("Fish", 1.5, 2, 2),
                 new Price("Lumber", 3.5, 3, 3)));
         // Define Agents
-        Agent a1 = new Agent("1", inventoryA1, prioritiesA1, consumption, fisherman, 0, 0);
-        Agent a2 = new Agent("2", inventoryA2, prioritiesA2, consumption, fisherman, 0, 0);
-        Agent a3 = new Agent("3", inventoryA3, prioritiesA3, consumption, fisherman, 0, 0);
-        Agent a4 = new Agent("4", inventoryA4, prioritiesA4, consumption, fisherman, 0, 0);
-        Agent a5 = new Agent("5", inventoryA5, prioritiesA5, consumption, fisherman, 0, 0);
-        Agent a6 = new Agent("6", inventoryA6, prioritiesA6, consumption, fisherman, 0, 0);
-        Agent a7 = new Agent("7", inventoryA7, prioritiesA7, consumption, fisherman, 0, 0);
-        Agent a8 = new Agent("8", inventoryA8, prioritiesA8, consumption, fisherman, 0, 0);
+        Agent a1 = new Agent("1", inventoryA1, prioritiesA1, consumption, lumberjack, 0, 0);
+        Agent a2 = new Agent("2", inventoryA2, prioritiesA2, consumption, lumberjack, 0, 0);
+        Agent a3 = new Agent("3", inventoryA3, prioritiesA3, consumption, lumberjack, 0, 0);
+        Agent a4 = new Agent("4", inventoryA4, prioritiesA4, consumption, lumberjack, 0, 0);
+        Agent a5 = new Agent("5", inventoryA5, prioritiesA5, consumption, lumberjack, 0, 0);
+        Agent a6 = new Agent("6", inventoryA6, prioritiesA6, consumption, lumberjack, 0, 0);
+        Agent a7 = new Agent("7", inventoryA7, prioritiesA7, consumption, lumberjack, 0, 0);
+        Agent a8 = new Agent("8", inventoryA8, prioritiesA8, consumption, lumberjack, 0, 0);
         Agent a9 = new Agent("9", inventoryA9, prioritiesA9, consumption, lumberjack, 0, 0);
         Agent a10 = new Agent("10", inventoryA10, prioritiesA10, consumption, lumberjack, 0, 0);
 
         // Lastly, define Market
         ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
-        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices);
+        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices, 10000);
 
         // run market
         // System.out.println(a1.getInventory());
@@ -741,11 +787,12 @@ public class Main {
                 System.out.println(market.getPrices());
                 System.out.println(market.getInventory());
                 printJobs(market);
+                printMoney(market);
             }
             if (counterVar % 100 == 0) {
                 System.out.println(market.getAgents());
             }
-            Thread.sleep(10);
+            Thread.sleep(5);
         }
 
         /*
@@ -1061,13 +1108,15 @@ class Market {
     private ArrayList<Item> inventory;
     private ArrayList<JobOutput> jobOutputs;
     private ArrayList<Price> prices;
+    private double money;
 
     public Market(ArrayList<Agent> agents, ArrayList<Item> inventory,
-                  ArrayList<JobOutput> jobOutputs, ArrayList<Price> prices){
+                  ArrayList<JobOutput> jobOutputs, ArrayList<Price> prices, double money){
         this.agents = agents;
         this.inventory = inventory;
         this.jobOutputs = jobOutputs;
         this.prices = prices;
+        this.money = money;
     }
     public ArrayList<Agent> getAgents(){
         return agents;
@@ -1081,6 +1130,9 @@ class Market {
     public ArrayList<Price> getPrices(){
         return prices;
     }
+    public double getMoney(){
+        return money;
+    }
     public void setAgents(ArrayList<Agent> newAgents){
         agents = newAgents;
     }
@@ -1092,6 +1144,9 @@ class Market {
     }
     public void setPrices(ArrayList<Price> newPrices){
         prices = newPrices;
+    }
+    public void setMoney(double newMoney){
+        money = newMoney;
     }
     public String toString(){
         return ("This market has the following agents: \n" + this.getAgents() + "\n" +
