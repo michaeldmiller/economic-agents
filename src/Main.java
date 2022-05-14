@@ -336,11 +336,32 @@ public class Main {
             double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
             // System.out.println(priceElasticityOfDemand);
             // 1 + (percent increase or decrease)
-            p.setRelativeNeed((consumedQuantity * 100) * (1 + (priceElasticityOfDemand / 100)));
+
+            // add decreasing marginal utility
+            double amountInInventory = 0;
+            for (Item i : a.getInventory()) {
+                if (i.getGood().equals(p.getGood())) {
+                    amountInInventory = i.getQuantity();
+                    break;
+                }
+            }
+            double decreasingMarginalUtility = 1;
+            if (amountInInventory > (5 * consumedQuantity)){
+                decreasingMarginalUtility = (((amountInInventory - (5 * consumedQuantity))
+                        / (5 * consumedQuantity)) * -100);
+            }
+
+            p.setRelativeNeed((consumedQuantity * 100) * (1 + (priceElasticityOfDemand / 100))
+                                                        * (1 + (decreasingMarginalUtility / 100)));
 
             // set final weight
             // adding modifier prevents price aversion from overwhelming need to buy something
             p.setWeight((p.getBaseWeight() * p.getRelativeNeed()) + p.getModifier());
+
+            // set negative weight to 0
+            if (p.getWeight() < 0){
+                p.setWeight(0);
+            }
 
             // if market inventory greater than 5 times current production of each good, reduce price of the good
             // if agent tries to buy from market but can't, price goes up, relative to number of agents in the market
@@ -500,9 +521,9 @@ public class Main {
                 }
                 // see if any other goods are more profitable
                 for (Price r : market.getPrices()){
-                    if (r.getEquilibriumCost() > agentEquilibriumPrice){
+                    if (r.getCost() > agentEquilibriumPrice){
                         // if so, 10% chance to switch to that profession, 1% chance per agent per tick overall
-                         if (Math.random() < 0.1){
+                         if (Math.random() < 0.01){
                              // find matching profession, set agent's profession
                              for (JobOutput o : market.getJobOutputs()){
                                  if (o.getGood().equals(r.getGood())){
@@ -557,9 +578,10 @@ public class Main {
         // make sure prices don't go negative:
         for (Price c : market.getPrices()){
             if (c.getCost() <= 0){
-                System.out.println("Price went below 0!!!");
+                // System.out.println("Price went below 0!!!");
                 c.setCost(c.getCost() + 0.2);
             }
+            /*
             // price normalization
             if (((c.getCost() - c.getEquilibriumCost())/ c.getEquilibriumCost()) > 0.25){
                 // if price too high from equilibrium, reduce
@@ -569,8 +591,9 @@ public class Main {
                 // if price too low from equilibrium, increase
                 c.setCost(c.getCost() + (0.025 * c.getEquilibriumCost()));
             }
+            */
             // temporary interpretation: set market equilibrium
-            if (counter % 10 == 0){
+            if (counter % 74 == 0){
                 // set equilibrium cost to average of original cost and cost
                 c.setEquilibriumCost((c.getCost() + c.getOriginalCost()) / 2);
             }
@@ -585,12 +608,10 @@ public class Main {
             }
         }
         // print market prices and inventory
-        System.out.println(market.getPrices());
-        System.out.println(market.getInventory());
-        printJobs(market);
+
 
         // System.out.println(market);
-        Thread.sleep(200);
+        // Thread.sleep(200);
 
     }
 
@@ -619,8 +640,8 @@ public class Main {
                 new Item("Lumber", 3.0)));
         ArrayList<Item> inventoryMarket = new ArrayList<Item>(List.of (new Item("Fish", 10.0),
                 new Item("Lumber", 2.0)));
-        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.665),
-                new Item("Lumber", 0.285))); //<-- 7:3 consumption rate, should force equilibrium
+        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.7),
+                new Item("Lumber", 0.3))); //<-- 7:3 consumption rate, should force equilibrium
 
         ArrayList<Item> inventoryA1 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
                 new Item("Lumber", 2.0)));
@@ -716,6 +737,14 @@ public class Main {
         while (true){
             runMarket(market, counterVar);
             counterVar++;
+            if (counterVar % 10 == 0){
+                System.out.println(market.getPrices());
+                System.out.println(market.getInventory());
+                printJobs(market);
+            }
+            if (counterVar % 100 == 0) {
+                System.out.println(market.getAgents());
+            }
             Thread.sleep(10);
         }
 
