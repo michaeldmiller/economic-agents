@@ -319,12 +319,28 @@ public class Main {
 
             // establish cost difference: positive means market is overcharging, negative undercharging
             // demand should decrease for overcharging, increase for undercharging
-            double relativeCostDifference = ((currentMarketCost - currentEquilibriumCost)/currentEquilibriumCost);
+            // relativeCostDifference is in percent
+            double relativeCostDifference = ((currentMarketCost - currentEquilibriumCost)/currentEquilibriumCost) * 100;
             // combine with elasticity, set relative need
-            p.setRelativeNeed(p.getBaseWeight() * p.getPriceElasticity());
+            // get consumption
+            double consumedQuantity = 0;
+            for (Item c : a.getConsumption()){
+                if (c.getGood().equals(p.getGood())){
+                    consumedQuantity = c.getQuantity();
+                    break;
+                }
+            }
+            // set demand curve, maybe actually working this time
+            // get price induced demand reduction/increase
+            // negative * negative = positive; positive * negative = negative
+            double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
+            // System.out.println(priceElasticityOfDemand);
+            // 1 + (percent increase or decrease)
+            p.setRelativeNeed((consumedQuantity * 100) * (1 + (priceElasticityOfDemand / 100)));
 
             // set final weight
-            p.setWeight(p.getBaseWeight() * p.getRelativeNeed() * p.getModifier());
+            // adding modifier prevents price aversion from overwhelming need to buy something
+            p.setWeight((p.getBaseWeight() * p.getRelativeNeed()) + p.getModifier());
 
             // if market inventory greater than 5 times current production of each good, reduce price of the good
             // if agent tries to buy from market but can't, price goes up, relative to number of agents in the market
@@ -347,7 +363,7 @@ public class Main {
             goods.add(p.getGood());
             // get weights, multiply them by 100 to extend relevance out to the hundredths place,
             // cast them to an integer
-            satisfactions.add((int) (Math.abs (p.getWeight() * 100)));
+            satisfactions.add((int) p.getWeight());
         }
         // System.out.println(satisfactions);
         // start loop to pick a good to purchase
@@ -495,6 +511,9 @@ public class Main {
                 System.out.println(a);
             }
         }
+        // print market prices and inventory
+        System.out.println(market.getPrices());
+        System.out.println(market.getInventory());
 
         // System.out.println(market);
         Thread.sleep(200);
