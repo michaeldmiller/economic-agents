@@ -264,39 +264,215 @@ public class Main {
         for (int i = 0; (i < a.getConsumption().size()); i++ ){
             Item newItem = new Item(a.getInventory().get(i).getGood(),
                     (a.getInventory().get(i).getQuantity() - a.getConsumption().get(i).getQuantity()));
-            // now protect against negatives and set relative need
+            // now protect against negatives and set need modifier
             if (newItem.getQuantity() <= 0){
                 newItem.setQuantity(0);
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(newItem.getGood())){
-                        p.setRelativeNeed(p.getRelativeNeed() * 1.5);
+                        p.setModifier(p.getRelativeNeed() * 1.5);
                     }
                 }
             }
             a.getInventory().set(i, newItem);
-            // reset relative need if agent has successfully acquired a sufficient amount of the good
+            // reset modifier if agent has successfully acquired a sufficient amount of the good
             if (a.getInventory().get(i).getQuantity() >= 1){
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(newItem.getGood())){
-                        p.setRelativeNeed(1.0);
+                        p.setModifier(1.0);
                     }
                 }
             }
 
         }
     }
-    /*
-    // apply Agent production to the Market
-    static void marketProduce (Market m){
+    // apply Agent consumption to the Market
+    static void marketConsume (Market m){
         for (Agent a : m.getAgents()){
-            agentProduce(a, m);
+            agentConsume(a, m);
         }
     }
-    */
+
+    // make purchasing decision (this is the hardest part)
+    // splitting into two functions: one which updates agent priorities,
+    // second which makes actual purchasing decision
+
+    static void agentPriorities (Agent a, Market m){
+        // thanks to inclusion of elasticity field in priorities, this is relatively simple, but subject
+        // to outside intervention: the given elasticity value must be ~generally correct~ in order for this to
+        // act correctly, as it is not generated from within. Thankfully, there are economic studies which reveal
+        // actual real-world price elasticity values, but whether this translates correctly to this model is
+        // currently unknown
+
+        // calculate current relative demand based on elasticity
+        for (Priority p : a.getPriorities()){
+            // get market values (may get market average here later)
+            double currentMarketCost = 0;
+            double currentEquilibriumCost = 0;
+            for (Price c : m.getPrices()){
+                if (p.getGood().equals(c.getGood())){
+                    currentMarketCost = c.getCost();
+                    currentEquilibriumCost = c.getEquilibriumCost();
+                    break;
+                }
+            }
+            // with market values in hand, make elasticity calculation
+
+            // establish cost difference: positive means market is overcharging, negative undercharging
+            // demand should decrease for overcharging, increase for undercharging
+            double relativeCostDifference = ((currentMarketCost - currentEquilibriumCost)/currentEquilibriumCost);
+            // combine with elasticity, set relative need
+            p.setRelativeNeed(p.getBaseWeight() * p.getPriceElasticity());
+
+            // set final weight
+            p.setWeight(p.getBaseWeight() * p.getRelativeNeed() * p.getModifier());
+
+            // if market inventory greater than 5 times current production of each good, reduce price of the good
+            // if agent tries to buy from market but can't, price goes up, relative to number of agents in the market
+        }
+    }
+    static void marketPriorities (Market m){
+        for (Agent a : m.getAgents()){
+            agentPriorities(a, m);
+        }
+    }
+
+    static void agentPurchase (Agent a, Market m){
+        boolean notPurchased = true;
+        double holdMoneySatisfaction = 0.5;
+        String purchasedGood = "";
+
+        ArrayList<String> goods = new ArrayList<String>();
+        ArrayList<Integer> satisfactions = new ArrayList<Integer>();
+        for (Priority p : a.getPriorities()) {
+            goods.add(p.getGood());
+            // get weights, multiply them by 100 to extend relevance out to the hundredths place,
+            // cast them to an integer
+            satisfactions.add((int) p.getWeight() * 100);
+        }
+        // start loop to pick a good to purchase
+        // Only and always purchases 1 unit of a good!
+        while (notPurchased) {
+            // make choice
+            String chosenGood = randomWeightedPick(goods, satisfactions);
+            // look up Good price
+            double chosenGoodPrice = 0;
+            for (Price c : m.getPrices()) {
+                if (c.getGood().equals(chosenGood)) {
+                    chosenGoodPrice = c.getCost();
+                    break;
+                }
+            }
+            // See if Agent can't afford to buy its chosen good
+            if (a.getMoney() < chosenGoodPrice) {
+                // find index of good
+                int index = 0;
+                for (int i = 0; i < goods.size(); i++) {
+                    if (goods.get(i).equals(chosenGood)) {
+                        index = i;
+                    }
+                }
+                // remove good from goods and satisfactions list
+                goods.remove(index);
+                satisfactions.remove(index);
+                continue;
+            }
+            // if it can afford to buy its chosen good, see if the market doesn't have any to sell
+            double availableQuantity = 0;
+            for (Item i : m.getInventory()) {
+                if (i.getGood().equals(chosenGood)) {
+                    availableQuantity = i.getQuantity();
+                }
+            }
+            if (availableQuantity < 1) {
+                // find index of good
+                int index = 0;
+                for (int i = 0; i < goods.size(); i++) {
+                    if (goods.get(i).equals(chosenGood)) {
+                        index = i;
+                    }
+                }
+                // remove good from goods and satisfactions list
+                goods.remove(index);
+                satisfactions.remove(index);
+
+                // alter price!
+                // determine weight of the agent
+                double agentImportance = 1.0 / m.getAgents().size();
+                // increase price by agentImportance * equilibriumPrice
+                for (Price c : m.getPrices())
+                    if (c.getGood().equals(chosenGood)) {
+                        c.setCost(c.getCost() + (agentImportance * c.getEquilibriumCost()));
+                    }
+                continue;
+            }
+            // check if the gained satisfaction is not above the base threshold of keeping the money
+            // find index of good
+            int index = 0;
+            for (int i = 0; i < goods.size(); i++){
+                if (goods.get(i).equals(chosenGood)) {
+                    index = i;
+                }
+            }
+            if (satisfactions.get(index) < holdMoneySatisfaction){
+                goods.remove(index);
+                satisfactions.remove(index);
+                continue;
+            }
+            // finally, if the Agent can afford a good, the market can sell it, and it would obtain significant
+            // value from the purchase, complete the transaction
+            // deduct from Agent's money:
+            a.setMoney(a.getMoney() - chosenGoodPrice);
+            // remove good from Market's inventory:
+            for (Item i : m.getInventory()){
+                if (i.getGood().equals(chosenGood)){
+                    i.setQuantity(i.getQuantity() +-1);
+                }
+            }
+            // add good to Agent's inventory
+            for (Item t : a.getInventory()){
+                if (t.getGood().equals(chosenGood)) {
+                    t.setQuantity(t.getQuantity() + 1);
+                }
+            }
+            notPurchased = false;
+            }
+        }
+
+    static void marketPurchase (Market m){
+        for (Agent a : m.getAgents()){
+            agentPurchase(a, m);
+        }
+    }
+
+
 
     // master controller function
     static void runMarket (Market market) throws InterruptedException {
         marketProduce(market);
+        marketConsume(market);
+        marketPriorities(market);
+        marketPurchase(market);
+
+        // temporary, provide upper unadjusted bound to market
+        for (Item i : market.getInventory()){
+            // 10 to be adjusted to 5 times per tick production of a good
+            if (i.getQuantity() > 10){
+                for (Price p : market.getPrices()){
+                    if (p.getGood().equals(i.getGood())){
+                        // reduce cost by 5% of equilibrium cost
+                        p.setCost(p.getCost() - (0.05 * p.getEquilibriumCost()));
+                    }
+                }
+            }
+        }
+        // make sure prices don't go negative:
+        for (Price c : market.getPrices()){
+            if (c.getCost() <= 0){
+                System.out.println("Price went below 0!!!");
+                c.setCost(c.getCost() + 0.1);
+            }
+        }
+
         System.out.println(market);
         Thread.sleep(1000);
 
@@ -329,29 +505,89 @@ public class Main {
                 new Item("Lumber", 2.0)));
         ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.35),
                 new Item("Lumber", 0.15))); //<-- 7:3 consumption rate, should force equilibrium
+
+        ArrayList<Item> inventoryA1 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA2 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA3 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA4 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA5 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA6 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA7 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA8 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                new Item("Lumber", 2.0)));
+        ArrayList<Item> inventoryA9 = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
+                new Item("Lumber", 3.0)));
+        ArrayList<Item> inventoryA10 = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
+                new Item("Lumber", 3.0)));
+
+
+
         // no SkillLevel code implemented, setting all to 1
         Profession fisherman = new Profession("Fisherman", 1.0);
         Profession lumberjack = new Profession("Lumberjack", 1.0);
         // All Agents have the same priorities
+        // https://en.wikipedia.org/wiki/Price_elasticity_of_demand
+        // Systematic approach to instantiating a market will have to be implemented in short order.
         ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 7.0, 1, 1, 7.0),
-                new Priority("Lumber", 3.0, 1, 1, 7.0)));
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA1 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA2 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA3 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA4 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA5 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA6 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA7 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA8 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA9 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+        ArrayList<Priority> prioritiesA10 = new ArrayList<Priority>(List.of(
+                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+
+
+
+
         ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
                 new JobOutput("Lumberjack", "Lumber")));
         ArrayList<Price> marketPrices = new ArrayList<Price>(List.of(
                 new Price("Fish", 1.5, 2, 2),
                 new Price("Lumber", 3.5, 3, 3)));
         // Define Agents
-        Agent a1 = new Agent("1", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a2 = new Agent("2", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a3 = new Agent("3", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a4 = new Agent("4", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a5 = new Agent("5", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a6 = new Agent("6", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a7 = new Agent("7", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a8 = new Agent("8", inventoryFish, priorities, consumption, fisherman, 0, 0);
-        Agent a9 = new Agent("9", inventoryLumber, priorities, consumption, lumberjack, 0, 0);
-        Agent a10 = new Agent("10", inventoryLumber, priorities, consumption, lumberjack, 0, 0);
+        Agent a1 = new Agent("1", inventoryA1, prioritiesA1, consumption, fisherman, 0, 0);
+        Agent a2 = new Agent("2", inventoryA2, prioritiesA2, consumption, fisherman, 0, 0);
+        Agent a3 = new Agent("3", inventoryA3, prioritiesA3, consumption, fisherman, 0, 0);
+        Agent a4 = new Agent("4", inventoryA4, prioritiesA4, consumption, fisherman, 0, 0);
+        Agent a5 = new Agent("5", inventoryA5, prioritiesA5, consumption, fisherman, 0, 0);
+        Agent a6 = new Agent("6", inventoryA6, prioritiesA6, consumption, fisherman, 0, 0);
+        Agent a7 = new Agent("7", inventoryA7, prioritiesA7, consumption, fisherman, 0, 0);
+        Agent a8 = new Agent("8", inventoryA8, prioritiesA8, consumption, fisherman, 0, 0);
+        Agent a9 = new Agent("9", inventoryA9, prioritiesA9, consumption, lumberjack, 0, 0);
+        Agent a10 = new Agent("10", inventoryA10, prioritiesA10, consumption, lumberjack, 0, 0);
 
         // Lastly, define Market
         ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
@@ -440,23 +676,23 @@ class Item {
 // A 'Priorities' is an ArrayList of Priority
 class Priority{
     private String good;
-    private double weight;
+
     private double baseWeight;
     private double relativeNeed;
     private double modifier;
+    private double priceElasticity;
+    private double weight;
     public Priority (String good, double baseWeight, double relativeNeed,
-                     double modifier, double weight){
+                     double modifier, double priceElasticity, double weight){
         this.good = good;
-        this.weight = weight;
         this.baseWeight = baseWeight;
         this.relativeNeed = relativeNeed;
         this.modifier = modifier;
+        this.priceElasticity = priceElasticity;
+        this.weight = weight;
     }
     public String getGood(){
         return good;
-    }
-    public double getWeight(){
-        return weight;
     }
     public double getBaseWeight(){
         return baseWeight;
@@ -466,6 +702,12 @@ class Priority{
     }
     public double getModifier(){
         return modifier;
+    }
+    public double getPriceElasticity(){
+        return priceElasticity;
+    }
+    public double getWeight(){
+        return weight;
     }
     public void setGood(String newGood){
         good = newGood;
@@ -479,6 +721,9 @@ class Priority{
     public void setModifier(double newModifier){
         modifier = newModifier;
     }
+    public void setPriceElasticity(double newPriceElasticity){
+        priceElasticity = newPriceElasticity;
+    }
     public void setWeight(double newWeight){
         weight = newWeight;
     }
@@ -487,6 +732,7 @@ class Priority{
                 "base weight: " + this.getBaseWeight() + ", " +
                 "relative need: " + this.getRelativeNeed() + ", " +
                 "modifier: " + this.getModifier() + ", " +
+                "price elasticity: " + this.getModifier() + ", " +
                 "final weight: " + this.getWeight() + ".");
     }
 }
