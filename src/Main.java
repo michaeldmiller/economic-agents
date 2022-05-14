@@ -476,15 +476,71 @@ public class Main {
             agentPurchase(a, m);
         }
     }
+    // Also need: diminishing unit utility for goods
 
+    // switch professions
+    static void changeSupply (Market market) {
+        for (Agent a : market.getAgents()){
+            if (Math.random() < 0.1){
+                // determine agent's good
+                String agentGood = "";
+                for (JobOutput j : market.getJobOutputs()){
+                    if (j.getJob().equals(a.getProfession().getJob())){
+                        agentGood = j.getGood();
+                        break;
+                    }
+                }
+                // determine equilibrium price of agent's good
+                double agentEquilibriumPrice = 0;
+                for(Price p : market.getPrices()){
+                    if (p.getGood().equals(agentGood)){
+                        agentEquilibriumPrice = p.getEquilibriumCost();
+                        break;
+                    }
+                }
+                // see if any other goods are more profitable
+                for (Price r : market.getPrices()){
+                    if (r.getEquilibriumCost() > agentEquilibriumPrice){
+                        // if so, 10% chance to switch to that profession, 1% chance per agent per tick overall
+                         if (Math.random() < 0.1){
+                             // find matching profession, set agent's profession
+                             for (JobOutput o : market.getJobOutputs()){
+                                 if (o.getGood().equals(r.getGood())){
+                                     a.setProfession((new Profession(o.getJob(), 1.0)));
+                                     break;
+                                 }
+                             }
+                             break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // print jobs
+    static void printJobs (Market market){
+        HashMap<String, Integer> jobsTotal = new HashMap<String, Integer>();
+        for (Agent a : market.getAgents()){
+            if (!jobsTotal.containsKey(a.getProfession().getJob())){
+                jobsTotal.put(a.getProfession().getJob(), 1);
+            }
+            else {
+                String key = a.getProfession().getJob();
+                jobsTotal.put(key, jobsTotal.get(key) + 1);
+            }
+        }
+        System.out.println(jobsTotal);
+    }
 
 
     // master controller function
-    static void runMarket (Market market) throws InterruptedException {
+    static void runMarket (Market market, int counter) throws InterruptedException {
         marketProduce(market);
         marketConsume(market);
         marketPriorities(market);
         marketPurchase(market);
+        changeSupply(market);
 
         // temporary, provide upper unadjusted bound to market
         for (Item i : market.getInventory()){
@@ -502,18 +558,36 @@ public class Main {
         for (Price c : market.getPrices()){
             if (c.getCost() <= 0){
                 System.out.println("Price went below 0!!!");
-                c.setCost(c.getCost() + 0.1);
+                c.setCost(c.getCost() + 0.2);
+            }
+            // price normalization
+            if (((c.getCost() - c.getEquilibriumCost())/ c.getEquilibriumCost()) > 0.25){
+                // if price too high from equilibrium, reduce
+                c.setCost(c.getCost() - (0.025 * c.getEquilibriumCost()));
+            }
+            if (((c.getCost() - c.getEquilibriumCost())/ c.getEquilibriumCost()) < -0.25){
+                // if price too low from equilibrium, increase
+                c.setCost(c.getCost() + (0.025 * c.getEquilibriumCost()));
+            }
+            // temporary interpretation: set market equilibrium
+            if (counter % 10 == 0){
+                // set equilibrium cost to average of original cost and cost
+                c.setEquilibriumCost((c.getCost() + c.getOriginalCost()) / 2);
             }
         }
+
+
+
         // print a specific Agent
         for (Agent a : market.getAgents()){
             if (a.getId().equals("1")){
-                System.out.println(a);
+                // System.out.println(a);
             }
         }
         // print market prices and inventory
         System.out.println(market.getPrices());
         System.out.println(market.getInventory());
+        printJobs(market);
 
         // System.out.println(market);
         Thread.sleep(200);
@@ -545,8 +619,8 @@ public class Main {
                 new Item("Lumber", 3.0)));
         ArrayList<Item> inventoryMarket = new ArrayList<Item>(List.of (new Item("Fish", 10.0),
                 new Item("Lumber", 2.0)));
-        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.35),
-                new Item("Lumber", 0.15))); //<-- 7:3 consumption rate, should force equilibrium
+        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.665),
+                new Item("Lumber", 0.285))); //<-- 7:3 consumption rate, should force equilibrium
 
         ArrayList<Item> inventoryA1 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
                 new Item("Lumber", 2.0)));
@@ -578,38 +652,38 @@ public class Main {
         // https://en.wikipedia.org/wiki/Price_elasticity_of_demand
         // Systematic approach to instantiating a market will have to be implemented in short order.
         ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA1 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.45, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA2 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA3 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA4 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA5 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA6 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA7 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA8 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA9 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA10 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
 
 
 
@@ -636,11 +710,13 @@ public class Main {
         Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices);
 
         // run market
-        System.out.println(a1.getInventory());
+        // System.out.println(a1.getInventory());
+        int counterVar = 0;
 
         while (true){
-            runMarket(market);
-            Thread.sleep(1000);
+            runMarket(market, counterVar);
+            counterVar++;
+            Thread.sleep(10);
         }
 
         /*
@@ -649,7 +725,7 @@ public class Main {
             agentConsume(a1, market);
             System.out.println(a1);
         }
-        // Agents are initialized incorrectly! inventoryFish is a common object, shared amongst each fisherman
+
         System.out.println("Change inventory");
         a1.setInventory(inventoryLumber);
         for (int i = 0; i < 5; i++){
@@ -946,7 +1022,7 @@ class Price{
         return ("\n" + this.getGood() + ", " +
                 "Cost: " + this.getCost() + ", " +
                 "Equilibrium Cost: " + this.getEquilibriumCost() + ", " +
-                "Original Cost: " + this.getEquilibriumCost());
+                "Original Cost: " + this.getOriginalCost());
     }
 }
 
