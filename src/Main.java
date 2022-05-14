@@ -347,8 +347,9 @@ public class Main {
             goods.add(p.getGood());
             // get weights, multiply them by 100 to extend relevance out to the hundredths place,
             // cast them to an integer
-            satisfactions.add((int) p.getWeight() * 100);
+            satisfactions.add((int) (Math.abs (p.getWeight() * 100)));
         }
+        // System.out.println(satisfactions);
         // start loop to pick a good to purchase
         // Only and always purchases 1 unit of a good!
         while (notPurchased) {
@@ -397,7 +398,7 @@ public class Main {
                 int index = 0;
                 for (int i = 0; i < goods.size(); i++) {
                     if (goods.get(i).equals(chosenGood)) {
-                        index = i - 1;
+                        index = i;
                     }
                 }
                 // System.out.println(index);
@@ -436,7 +437,7 @@ public class Main {
             a.setMoney(a.getMoney() - chosenGoodPrice);
             // remove good from Market's inventory:
             for (Item i : m.getInventory()){
-                System.out.println("removing from inventory");
+                // System.out.println("removing from inventory");
                 if (i.getGood().equals(chosenGood)){
                     i.setQuantity(i.getQuantity() - 1);
                     break;
@@ -562,7 +563,7 @@ public class Main {
                 new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA1 = new ArrayList<Priority>(List.of(
                 new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
+                new Priority("Lumber", 0.45, 1, 1, -0.7, 0.15)));
         ArrayList<Priority> prioritiesA2 = new ArrayList<Priority>(List.of(
                 new Priority("Fish", 0.35, 1, 1, -0.5, 0.35),
                 new Priority("Lumber", 0.15, 1, 1, -0.7, 0.15)));
@@ -756,7 +757,7 @@ class Priority{
                 "base weight: " + this.getBaseWeight() + ", " +
                 "relative need: " + this.getRelativeNeed() + ", " +
                 "modifier: " + this.getModifier() + ", " +
-                "price elasticity: " + this.getModifier() + ", " +
+                "price elasticity: " + this.getPriceElasticity() + ", " +
                 "final weight: " + this.getWeight() + ".");
     }
 }
