@@ -250,8 +250,6 @@ public class Main {
         }
         // Note: Agent does not produce if Market cannot pay!
 
-
-
     }
 
     // apply Agent production to the Market
@@ -276,7 +274,8 @@ public class Main {
                 newItem.setQuantity(0);
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(newItem.getGood())){
-                        p.setModifier(p.getRelativeNeed() * 1.5);
+                        // add cumulative need effect
+                        p.setModifier(p.getRelativeNeed() * 1.5 + (0.1 * p.getModifier()));
                     }
                 }
             }
@@ -325,7 +324,6 @@ public class Main {
             // with market values in hand, make elasticity calculation
 
             // establish cost difference: positive means market is overcharging, negative undercharging
-            // demand should decrease for overcharging, increase for undercharging
             // relativeCostDifference is in percent
             double relativeCostDifference = ((currentMarketCost - currentEquilibriumCost)/currentEquilibriumCost) * 100;
             // combine with elasticity, set relative need
@@ -341,8 +339,6 @@ public class Main {
             // get price induced demand reduction/increase
             // negative * negative = positive; positive * negative = negative
             double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
-            // System.out.println(priceElasticityOfDemand);
-            // 1 + (percent increase or decrease)
 
             // add decreasing marginal utility
             double amountInInventory = 0;
@@ -383,7 +379,6 @@ public class Main {
     static void agentPurchase (Agent a, Market m){
         boolean notPurchased = true;
         double holdMoneySatisfaction = 0.5;
-        String purchasedGood = "";
 
         ArrayList<String> goods = new ArrayList<String>();
         ArrayList<Integer> satisfactions = new ArrayList<Integer>();
@@ -393,7 +388,6 @@ public class Main {
             // cast them to an integer
             satisfactions.add((int) p.getWeight());
         }
-        // System.out.println(satisfactions);
         // start loop to pick a good to purchase
         // Only and always purchases 1 unit of a good!
         while (notPurchased) {
@@ -401,7 +395,6 @@ public class Main {
             if (goods.size() == 0){
                 break;
             }
-
 
             // make choice
             String chosenGood = randomWeightedPick(goods, satisfactions);
@@ -413,8 +406,6 @@ public class Main {
                     break;
                 }
             }
-            // System.out.println("Chosen Good: " + chosenGood);
-            // System.out.println("Chosen Good's Price : " + chosenGoodPrice);
             // See if Agent can't afford to buy its chosen good
             if (a.getMoney() < chosenGoodPrice) {
                 // find index of good
@@ -436,7 +427,6 @@ public class Main {
                     availableQuantity = i.getQuantity();
                 }
             }
-            // System.out.println("Available quantity: " + availableQuantity);
             if (availableQuantity < 1) {
                 // find index of good
                 int index = 0;
@@ -445,8 +435,6 @@ public class Main {
                         index = i;
                     }
                 }
-                // System.out.println(index);
-                // System.out.println(goods.get(index));
                 // remove good from goods and satisfactions list
                 goods.remove(index);
                 satisfactions.remove(index);
@@ -707,60 +695,17 @@ public class Main {
         marketPurchase(market);
         marketPrices(market);
         changeSupply(market);
-        /*
-        // temporary, provide upper unadjusted bound to market
-        for (Item i : market.getInventory()){
-            // 10 to be adjusted to 5 times per tick production of a good
-            if (i.getQuantity() > 50){
-                for (Price p : market.getPrices()){
-                    if (p.getGood().equals(i.getGood())){
-                        // reduce cost by 5% of equilibrium cost
-                        p.setCost(p.getCost() - (0.05 * p.getEquilibriumCost()));
-                    }
-                }
-            }
-        }
 
-         */
         // make sure prices don't go negative:
         for (Price c : market.getPrices()){
             if (c.getCost() <= 0){
                 // System.out.println("Price went below 0!!!");
                 c.setCost(c.getCost() + 0.2);
             }
-            /*
-            // price normalization
-            if (((c.getCost() - c.getEquilibriumCost())/ c.getEquilibriumCost()) > 0.25){
-                // if price too high from equilibrium, reduce
-                c.setCost(c.getCost() - (0.025 * c.getEquilibriumCost()));
-            }
-            if (((c.getCost() - c.getEquilibriumCost())/ c.getEquilibriumCost()) < -0.25){
-                // if price too low from equilibrium, increase
-                c.setCost(c.getCost() + (0.025 * c.getEquilibriumCost()));
-            }
-            // temporary interpretation: set market equilibrium
-            if (counter % 221 == 0){
-                // set equilibrium cost to average of original cost and cost
-                c.setEquilibriumCost(c.getCost());
-            }
-             */
+
             // new temporary: set cost to equilibrium cost every tick
             c.setCost(c.getEquilibriumCost());
         }
-
-
-
-        // print a specific Agent
-        for (Agent a : market.getAgents()){
-            if (a.getId().equals("1")){
-                // System.out.println(a);
-            }
-        }
-        // print market prices and inventory
-
-
-        // System.out.println(market);
-        // Thread.sleep(200);
 
     }
 
@@ -864,6 +809,7 @@ public class Main {
                 new Price("Fish", 1.5, 2, 2),
                 new Price("Lumber", 3.5, 3, 3)));
         // Define Agents
+        /*
         Agent a1 = new Agent("1", inventoryA1, prioritiesA1, consumption, lumberjack, 0, 0);
         Agent a2 = new Agent("2", inventoryA2, prioritiesA2, consumption, lumberjack, 0, 0);
         Agent a3 = new Agent("3", inventoryA3, prioritiesA3, consumption, lumberjack, 0, 0);
@@ -874,10 +820,47 @@ public class Main {
         Agent a8 = new Agent("8", inventoryA8, prioritiesA8, consumption, lumberjack, 0, 0);
         Agent a9 = new Agent("9", inventoryA9, prioritiesA9, consumption, lumberjack, 0, 0);
         Agent a10 = new Agent("10", inventoryA10, prioritiesA10, consumption, lumberjack, 0, 0);
+         */
+
+        // random number of agents
+        int numberOfAgents = (int) (70 * Math.random());
+        int agentInitializer = 0;
+        ArrayList<Agent> agents = new ArrayList<Agent>();
+        int agentID = 1;
+        while (agentInitializer < numberOfAgents){
+            double jobChoice = Math.random();
+            // Lumberjack 30% of the time
+            if (jobChoice < 0.3){
+                agents.add(new Agent(Integer.toString(agentID),
+                        new ArrayList<Item>(List.of (new Item("Fish", 1.5),
+                                new Item("Lumber", 3.0))),
+                        new ArrayList<Priority>(List.of(
+                                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                                new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
+                        new ArrayList<Item>(List.of (new Item("Fish", 0.7),
+                                new Item("Lumber", 0.3))),
+                        new Profession("Lumberjack", 1.0, 1, 0.7), 0, 0));
+            }
+            // otherwise Fisherman
+            else{
+                agents.add(new Agent(Integer.toString(agentID),
+                        new ArrayList<Item>(List.of (new Item("Fish", 2.0),
+                                new Item("Lumber", 2.0))),
+                        new ArrayList<Priority>(List.of(
+                                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
+                                new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
+                        new ArrayList<Item>(List.of (new Item("Fish", 0.7),
+                                new Item("Lumber", 0.3))),
+                        new Profession("Fisherman", 1.0, 1, 0.7), 0, 0));
+            }
+            agentInitializer++;
+            agentID++;
+
+        }
 
         // Lastly, define Market
-        ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
-        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices, 10000);
+        //ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
+        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices, 1000 * agents.size());
 
         // run market
         // System.out.println(a1.getInventory());
@@ -890,30 +873,12 @@ public class Main {
                 System.out.println(market.getPrices());
                 System.out.println(market.getInventory());
                 printJobs(market);
-                printMoney(market);
             }
             if (counterVar % 100 == 0) {
                 System.out.println(market.getAgents());
             }
-            Thread.sleep(5);
+            Thread.sleep(50);
         }
-
-        /*
-        for (int i = 0; i < 10; i++){
-            agentProduce(a1, market);
-            agentConsume(a1, market);
-            System.out.println(a1);
-        }
-
-        System.out.println("Change inventory");
-        a1.setInventory(inventoryLumber);
-        for (int i = 0; i < 5; i++){
-            agentProduce(a1, market);
-            agentConsume(a1, market);
-            System.out.println(a1);
-        }
-
-         */
 
     }
 }
@@ -975,7 +940,6 @@ class Item {
 // A 'Priorities' is an ArrayList of Priority
 class Priority{
     private String good;
-
     private double baseWeight;
     private double relativeNeed;
     private double modifier;
@@ -1158,7 +1122,6 @@ class Agent {
 class JobOutput{
     private String job;
     private String good;
-
     public JobOutput (String job, String good){
         this.job = job;
         this.good = good;
