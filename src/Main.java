@@ -631,11 +631,11 @@ public class Main {
         // calculate equilibrium price
 
         for (Price p : market.getPrices()){
-            double averageDemandElasticity = 0;
+            // double averageDemandElasticity = 0;
             double sumDemandIntercept = 0;
             // ArrayList<Double> demandElasticities = new ArrayList<Double>();
             double demandSum = 0;
-            double averageSupplyElasticity = 0;
+            // double averageSupplyElasticity = 0;
             double sumSupplyIntercept = 0;
             // ArrayList<Double> supplyElasticities = new ArrayList<Double>();
             double supplySum = 0;
@@ -677,15 +677,19 @@ public class Main {
             }
 
             // calculate average supply and demand elasticities
-            averageDemandElasticity = demandSum / (double) market.getAgents().size();
-            averageSupplyElasticity = supplySum / numOfProducers;
 
             // System cannot handle Agents producing anything other than 1 of a good, production needs to be multiplied
             // by price elasticity of supply before going into below equation
 
+            // assume equilibrium quantity, solve for P
+            // (supplySum * P) + sumSupplyIntercept = (demandSum * P) + sumDemandIntercept
+            // (supplySum * P) - (demandSum * P) + sumSupplyIntercept = sumDemandIntercept
+            // (supplySum * P) - (demandSum * P) = sumDemandIntercept - sumSupplyIntercept
+            // (supplySum - demandSum) * P = sumDemandIntercept - sumSupplyIntercept
+            // P = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum)
+
             // calculate intercept price
-            double goodPrice = averageSupplyElasticity + (-1 * averageDemandElasticity)
-                    + sumDemandIntercept + sumSupplyIntercept;
+            double goodPrice = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum);
 
             p.setEquilibriumCost(goodPrice);
         }
