@@ -455,10 +455,13 @@ public class Main {
                 // determine weight of the agent
                 double agentImportance = 1.0 / m.getAgents().size();
                 // increase price by agentImportance * equilibriumPrice
+                /*
                 for (Price c : m.getPrices())
                     if (c.getGood().equals(chosenGood)) {
                         c.setCost(c.getCost() + (agentImportance * c.getEquilibriumCost()));
                     }
+
+                 */
                 continue;
             }
             // check if the gained satisfaction is not above the base threshold of keeping the money
@@ -513,6 +516,8 @@ public class Main {
                 }
 
             */
+
+            /*
             for (Item marketItem : m.getInventory()){
                 // crude version of production
                 if (marketItem.getQuantity() > (10 * m.getAgents().size())) {
@@ -523,7 +528,7 @@ public class Main {
                     }
                 }
             }
-
+             */
 
             notPurchased = false;
             break;
@@ -538,6 +543,8 @@ public class Main {
     // Also need: diminishing unit utility for goods
 
     // switch professions
+    // does not work with new system, needs to calculate whether there is a shortage of production on the market,
+    // factor this in with good price in order to decide if Agent will switch
     static void changeSupply (Market market) {
         for (Agent a : market.getAgents()){
             if (Math.random() < 0.1){
@@ -565,7 +572,10 @@ public class Main {
                              // find matching profession, set agent's profession
                              for (JobOutput o : market.getJobOutputs()){
                                  if (o.getGood().equals(r.getGood())){
-                                     a.setProfession((new Profession(o.getJob(), 1.0)));
+                                     a.setProfession((new Profession(o.getJob(), 1.0,
+                                             1.0, 0.7)));
+                                     // eventually the correct price elasticity will need to be stored with the
+                                     // good, then variance calculated, so it can be set here.
                                      break;
                                  }
                              }
@@ -600,6 +610,90 @@ public class Main {
         System.out.println(totalMoney);
     }
 
+    // https://www.dummies.com/article/business-careers-money/business/economics/
+    // how-to-determine-price-find-economic-equilibrium-between-supply-and-demand-166981/
+
+
+    static void marketPrices (Market market){
+        // given a Market, calculate the Supply and Demand equilibrium for each good, then
+        // use this to set the prices of each good
+
+        // use relatively inelastic, this function is to calculate short run changes, long-term changes
+        // are handled by reassigning agent professions
+
+        // Formula for price elasticity of demand: Q = (PriceElasticity * P) + (10 * GoodConsumption)
+        // Conveniently, all of the above are already available.
+
+        // Formula for price elasticity of supply: Q = (PriceElasticity * P) - (Production * GoodMinimum)
+        // Good minimum is the minimum percent of production that an Agent must produce given its profession,
+        // can possibly set to 0, will do so temporarily
+
+        // calculate equilibrium price
+
+        for (Price p : market.getPrices()){
+            double averageDemandElasticity = 0;
+            double sumDemandIntercept = 0;
+            // ArrayList<Double> demandElasticities = new ArrayList<Double>();
+            double demandSum = 0;
+            double averageSupplyElasticity = 0;
+            double sumSupplyIntercept = 0;
+            // ArrayList<Double> supplyElasticities = new ArrayList<Double>();
+            double supplySum = 0;
+            double numOfProducers = 1;
+
+            // determine profession of the good:
+            String jobType = "";
+            for (JobOutput j : market.getJobOutputs()){
+                if (j.getGood().equals(p.getGood())){
+                    jobType = j.getJob();
+                }
+            }
+
+            // get each agent's production and demand curves
+            for (Agent a : market.getAgents()){
+                // add to demand elasticities
+                for (Priority r : a.getPriorities()){
+                    if (r.getGood().equals(p.getGood())){
+                        demandSum = demandSum + r.getPriceElasticity();
+                    }
+                }
+                // add demand intercept to sum
+                for (Item i : a.getConsumption()){
+                    if (i.getGood().equals(p.getGood())){
+                        sumDemandIntercept = sumDemandIntercept + (i.getQuantity() * 10);
+                    }
+                }
+                supplySum = supplySum + a.getProfession().getPriceElasticityOfSupply();
+                // good minimum not dealt with, all production has 0 minimum across all Agents
+
+                // conditionally add to number of producers
+                if (a.getProfession().getJob().equals(jobType)){
+                    numOfProducers++;
+                }
+            }
+            // reset numOfProducers if there are Producers (starts off as 1 instead of 0 to prevent div/0 errors)
+            if (numOfProducers > 1){
+                numOfProducers = numOfProducers - 1;
+            }
+
+            // calculate average supply and demand elasticities
+            averageDemandElasticity = demandSum / (double) market.getAgents().size();
+            averageSupplyElasticity = supplySum / numOfProducers;
+
+            // System cannot handle Agents producing anything other than 1 of a good, production needs to be multiplied
+            // by price elasticity of supply before going into below equation
+
+            // calculate intercept price
+            double goodPrice = averageSupplyElasticity + (-1 * averageDemandElasticity)
+                    + sumDemandIntercept + sumSupplyIntercept;
+
+            p.setEquilibriumCost(goodPrice);
+        }
+    }
+
+
+
+
 
     // master controller function
     static void runMarket (Market market, int counter) throws InterruptedException {
@@ -607,8 +701,9 @@ public class Main {
         marketConsume(market);
         marketPriorities(market);
         marketPurchase(market);
+        marketPrices(market);
         changeSupply(market);
-
+        /*
         // temporary, provide upper unadjusted bound to market
         for (Item i : market.getInventory()){
             // 10 to be adjusted to 5 times per tick production of a good
@@ -621,6 +716,8 @@ public class Main {
                 }
             }
         }
+
+         */
         // make sure prices don't go negative:
         for (Price c : market.getPrices()){
             if (c.getCost() <= 0){
@@ -637,12 +734,14 @@ public class Main {
                 // if price too low from equilibrium, increase
                 c.setCost(c.getCost() + (0.025 * c.getEquilibriumCost()));
             }
-            */
             // temporary interpretation: set market equilibrium
             if (counter % 221 == 0){
                 // set equilibrium cost to average of original cost and cost
                 c.setEquilibriumCost(c.getCost());
             }
+             */
+            // new temporary: set cost to equilibrium cost every tick
+            c.setCost(c.getEquilibriumCost());
         }
 
 
@@ -713,8 +812,8 @@ public class Main {
 
 
         // no SkillLevel code implemented, setting all to 1
-        Profession fisherman = new Profession("Fisherman", 1.0);
-        Profession lumberjack = new Profession("Lumberjack", 1.0);
+        Profession fisherman = new Profession("Fisherman", 1.0, 1, 0.7);
+        Profession lumberjack = new Profession("Lumberjack", 1.0, 1, 0.7);
         // All Agents have the same priorities
         // https://en.wikipedia.org/wiki/Price_elasticity_of_demand
         // Systematic approach to instantiating a market will have to be implemented in short order.
@@ -938,10 +1037,14 @@ class Priority{
 class Profession {
     private String job;
     private double skillLevel;
+    private double shortRunProduction;
+    private double priceElasticityOfSupply;
 
-    public Profession (String job, double skillLevel){
+    public Profession (String job, double skillLevel, double shortRunProduction, double priceElasticityOfSupply){
         this.job = job;
         this.skillLevel = skillLevel;
+        this.shortRunProduction = shortRunProduction;
+        this.priceElasticityOfSupply = priceElasticityOfSupply;
     }
     public String getJob(){
         return job;
@@ -949,11 +1052,24 @@ class Profession {
     public double getSkillLevel(){
         return skillLevel;
     }
+    public double getShortRunProduction(){
+        return shortRunProduction;
+    }
+    public double getPriceElasticityOfSupply(){
+        return priceElasticityOfSupply;
+    }
+
     public void setJob(String newJob){
         job = newJob;
     }
     public void setSkillLevel(double newSkillLevel){
         skillLevel = newSkillLevel;
+    }
+    public void setPriceElasticityOfSupply(double newPriceElasticity){
+        priceElasticityOfSupply = newPriceElasticity;
+    }
+    public void setShortRunProduction(double newProduction){
+        shortRunProduction = newProduction;
     }
 
     public String toString(){
