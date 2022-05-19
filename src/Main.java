@@ -534,52 +534,7 @@ public class Main {
             agentPurchase(a, m);
         }
     }
-    // Also need: diminishing unit utility for goods
 
-    // switch professions
-    // does not work with new system, needs to calculate whether there is a shortage of production on the market,
-    // factor this in with good price in order to decide if Agent will switch
-    static void changeSupply (Market market) {
-        for (Agent a : market.getAgents()){
-            if (Math.random() < 0.1){
-                // determine agent's good
-                String agentGood = "";
-                for (JobOutput j : market.getJobOutputs()){
-                    if (j.getJob().equals(a.getProfession().getJob())){
-                        agentGood = j.getGood();
-                        break;
-                    }
-                }
-                // determine equilibrium price of agent's good
-                double agentEquilibriumPrice = 0;
-                for(Price p : market.getPrices()){
-                    if (p.getGood().equals(agentGood)){
-                        agentEquilibriumPrice = p.getEquilibriumCost();
-                        break;
-                    }
-                }
-                // see if any other goods are more profitable
-                for (Price r : market.getPrices()){
-                    if (r.getCost() > agentEquilibriumPrice){
-                        // if so, 10% chance to switch to that profession, 1% chance per agent per tick overall
-                         if (Math.random() < 0.01){
-                             // find matching profession, set agent's profession
-                             for (JobOutput o : market.getJobOutputs()){
-                                 if (o.getGood().equals(r.getGood())){
-                                     a.setProfession((new Profession(o.getJob(), 1.0,
-                                             1.0, 0.7)));
-                                     // eventually the correct price elasticity will need to be stored with the
-                                     // good, then variance calculated, so it can be set here.
-                                     break;
-                                 }
-                             }
-                             break;
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // print jobs
     static void printJobs (Market market){
@@ -798,6 +753,59 @@ public class Main {
                 }
             }
         }
+
+        // Agent profession switching being implemented here, so that it can access production difference.
+        // To separate this into another function, have the market store the cumulative production and consumption
+        // hashmaps as a field of the market class.
+
+        for (Agent changingCareer : market.getAgents()){
+            // * square root of absolute value of satisfaction
+            // check if the agent is unhappy about their production;
+            if (changingCareer.getSatisfaction() < 0){
+                // if so, get percent chance to switch
+                // derived from square root of absolute value of satisfaction
+                double baseChance = Math.sqrt(Math.abs(changingCareer.getSatisfaction()));
+                // set threshold: if Agent does not have at least 25 unhappiness, no chance of switching
+                if (baseChance < 5){
+                    baseChance = 0;
+                }
+                // generate random number, pair with base chance, have agent switch professions if true
+                // should be 100, offset by base 1/250 chance, i.e. 25000
+                if ((Math.random() * 25000) < baseChance){
+                    // Agent attempts to switch into a new profession
+                    // make agent prioritise underutilized profession, make random weighted choice based on
+                    // the size of the production deficit
+                    ArrayList<String> goodChoices = new ArrayList<>();
+                    ArrayList<Integer> goodWeights = new ArrayList<>();
+                    for (Map.Entry<String, Double> productionDiff : productionDifference.entrySet()){
+                        if (productionDiff.getValue() < 0) {
+                            goodChoices.add(productionDiff.getKey());
+                            goodWeights.add((int) Math.abs((productionDiff.getValue() * 100)));
+                        }
+                    }
+
+                    // ensure there is a profession in deficit
+                    if (goodChoices.size() > 0){
+                        String professionGoodChoice = randomWeightedPick(goodChoices, goodWeights);
+                        // look up profession
+                        String newAgentJob = "";
+                        for (JobOutput newJobPossibilities : market.getJobOutputs()){
+                            if (newJobPossibilities.getGood().equals(professionGoodChoice)){
+                                newAgentJob = newJobPossibilities.getJob();
+                            }
+                        }
+                        // set new agent profession
+                        changingCareer.setProfession((new Profession(newAgentJob, 1.0,
+                                1.0, 0.7)));
+                        // reset agent satisfaction
+                        changingCareer.setSatisfaction(0.0);
+
+                    }
+
+                }
+            }
+        }
+
     }
 
 
@@ -809,7 +817,7 @@ public class Main {
         marketPurchase(market);
         marketPrices(market);
         marketProductionSatisfaction(market);
-        changeSupply(market);
+        // changeSupply(market);
 
         // make sure prices don't go negative:
         for (Price c : market.getPrices()){
@@ -875,7 +883,7 @@ public class Main {
         while (agentInitializer < numberOfAgents){
             double jobChoice = Math.random();
             // Lumberjack 30% of the time
-            if (jobChoice < 0.3){
+            if (jobChoice < 0.9){
                 agents.add(new Agent(Integer.toString(agentID),
                         new ArrayList<Item>(List.of (new Item("Fish", 1.5),
                                 new Item("Lumber", 3.0))),
