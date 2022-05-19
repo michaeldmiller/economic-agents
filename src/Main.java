@@ -395,7 +395,6 @@ public class Main {
             if (goods.size() == 0){
                 break;
             }
-
             // make choice
             String chosenGood = randomWeightedPick(goods, satisfactions);
             // look up Good price
@@ -439,17 +438,24 @@ public class Main {
                 goods.remove(index);
                 satisfactions.remove(index);
 
-                // alter price!
-                // determine weight of the agent
-                double agentImportance = 1.0 / m.getAgents().size();
-                // increase price by agentImportance * equilibriumPrice
-                /*
-                for (Price c : m.getPrices())
-                    if (c.getGood().equals(chosenGood)) {
-                        c.setCost(c.getCost() + (agentImportance * c.getEquilibriumCost()));
+                // diminish production satisfaction of other goods
+                // find job title for the good
+                String jobTitle = "";
+                for (JobOutput j : m.getJobOutputs()){
+                    if (j.getGood().equals(chosenGood)){
+                        jobTitle = j.getJob();
+                        break;
                     }
+                }
+                for (Agent agents : m.getAgents()){
+                    if (!a.getProfession().getJob().equals(jobTitle)){
+                        a.setSatisfaction(a.getSatisfaction() - 1);
+                    }
+                }
 
-                 */
+
+                // determine weight of the agent
+
                 continue;
             }
             // check if the gained satisfaction is not above the base threshold of keeping the money
@@ -598,10 +604,6 @@ public class Main {
         System.out.println(totalMoney);
     }
 
-    // https://www.dummies.com/article/business-careers-money/business/economics/
-    // how-to-determine-price-find-economic-equilibrium-between-supply-and-demand-166981/
-
-
     static void marketPrices (Market market){
         // given a Market, calculate the Supply and Demand equilibrium for each good, then
         // use this to set the prices of each good
@@ -619,13 +621,9 @@ public class Main {
         // calculate equilibrium price
 
         for (Price p : market.getPrices()){
-            // double averageDemandElasticity = 0;
             double sumDemandIntercept = 0;
-            // ArrayList<Double> demandElasticities = new ArrayList<Double>();
             double demandSum = 0;
-            // double averageSupplyElasticity = 0;
             double sumSupplyIntercept = 0;
-            // ArrayList<Double> supplyElasticities = new ArrayList<Double>();
             double supplySum = 0;
             double numOfProducers = 1;
 
@@ -677,14 +675,130 @@ public class Main {
             // P = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum)
 
             // calculate intercept price
+            // double goodPrice = (sumDemandIntercept - numOfProducers) / (0 - demandSum);
             double goodPrice = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum);
 
             p.setEquilibriumCost(goodPrice);
+
+            // calculate market quantity
+            // now, given P, calculate Q
+            // System.out.println(supplySum);
+            double goodQuantity = (demandSum * goodPrice) + sumDemandIntercept;
+            // System.out.println(goodQuantity);
         }
     }
 
+    static void marketProductionSatisfaction (Market market){
+        // given a market, calculate cumulative consumption and production of each good, use this to determine whether
+        // a good is over or under produced, then affect agent satisfaction accordingly.
 
+        // part 1: calculate cumulative consumption and production
+        HashMap<String, Double> cumulativeConsumption = new HashMap<>();
+        HashMap<String, Double> cumulativeProduction = new HashMap<>();
 
+        for (Agent a : market.getAgents()){
+            // get agent consumptions, store in consumption hash map
+            for (Item i : a.getConsumption()){
+                if (!cumulativeConsumption.containsKey(i.getGood())){
+                    cumulativeConsumption.put(i.getGood(), i.getQuantity());
+                }
+                else {
+                    String key = i.getGood();
+                    cumulativeConsumption.put(key, cumulativeConsumption.get(key) + i.getQuantity());
+                }
+            }
+            // get agent production, store in production hash map
+            String agentJob = a.getProfession().getJob();
+            String agentGoodProduced = "";
+            // * NOTE: the below line will not work if Agent production calculations are changed *
+            double agentQuantityProduced = a.getProfession().getSkillLevel();
+            for (JobOutput j : market.getJobOutputs()){
+                if (j.getJob().equals(agentJob)){
+                    agentGoodProduced = j.getGood();
+                }
+            }
+            if (!cumulativeProduction.containsKey(agentGoodProduced)){
+                cumulativeProduction.put(agentGoodProduced, agentQuantityProduced);
+            }
+            else {
+                cumulativeProduction.put(agentGoodProduced,
+                        cumulativeProduction.get(agentGoodProduced) + agentQuantityProduced);
+            }
+        }
+
+        // part 2: with cumulative consumption and production and consumption in hand, calculate difference:
+        HashMap<String, Double> productionDifference = new HashMap<>();
+        for (Map.Entry<String, Double> consumption : cumulativeConsumption.entrySet()){
+            // get consumption value
+            double amountConsumed = consumption.getValue();
+            // get produced value
+            double amountProduced = cumulativeProduction.get(consumption.getKey());
+            productionDifference.put(consumption.getKey(), amountProduced - amountConsumed);
+            /*
+            if (!productionDifference.containsKey(consumption.getKey())){
+                productionDifference.put(consumption.getKey(), amountProduced - amountConsumed);
+            }
+            else {
+                productionDifference.put(consumption.getKey(),
+                        productionDifference.get(consumption.getKey()) + amountProduced - amountConsumed);
+            }
+             */
+        }
+
+        // part 3: given production differences, affect satisfaction of agents accordingly
+        for (Map.Entry<String, Double> difference : productionDifference.entrySet()){
+            // if a good is under produced, slightly reduce the production satisfaction of agents producing
+            // every other good, reflecting that agents in the market in general have an incentive to switch
+            // into producing this good
+            if (difference.getValue() < 0){
+                // determine shorted profession
+                String shortedProfession = "";
+                for (JobOutput o : market.getJobOutputs()){
+                    if (o.getGood().equals(difference.getKey())){
+                        shortedProfession = o.getJob();
+                        break;
+                    }
+                }
+                // loop through all agents, if they are not in the shorted profession, reduce their satisfaction by 0.5
+                for (Agent agent : market.getAgents()){
+                    if (!agent.getProfession().getJob().equals(shortedProfession)){
+                        agent.setSatisfaction(agent.getSatisfaction() - 0.5);
+                    }
+                }
+            }
+            // if a good is not under produced, it is in equilibrium or overproduced. In this case, check to see
+            // if agents producing the good should have their production satisfaction increased as an incentive
+            // for being in equilibrium
+
+            // check if market is flooded, otherwise reward the agent
+            // get market inventory
+            double marketInventory = 0;
+            for (Item marketGood : market.getInventory()){
+                if (marketGood.getGood().equals(difference.getKey())){
+                    marketInventory = marketGood.getQuantity();
+                    break;
+                }
+            }
+            // market is not flooded if it has less than 10 times the sum of the Agents per tick consumption on hand.
+            if (marketInventory < (10 * cumulativeConsumption.get(difference.getKey()))){
+                // if the market isn't flooded, reward producers of the good by increasing their satisfaction
+                for (Agent goodProducer : market.getAgents()){
+                    boolean producesCorrectGood = false;
+                    String agentGood = "";
+                    String agentJob = goodProducer.getProfession().getJob();
+                    for (JobOutput jobs : market.getJobOutputs()){
+                        if (jobs.getJob().equals(agentJob)){
+                            agentGood = jobs.getGood();
+                            break;
+                        }
+                    }
+                    if (difference.getKey().equals(agentGood)){
+                        goodProducer.setSatisfaction(goodProducer.getSatisfaction() + 1);
+                    }
+                }
+            }
+        }
+    }
 
 
     // master controller function
@@ -694,6 +808,7 @@ public class Main {
         marketPriorities(market);
         marketPurchase(market);
         marketPrices(market);
+        marketProductionSatisfaction(market);
         changeSupply(market);
 
         // make sure prices don't go negative:
@@ -708,7 +823,6 @@ public class Main {
         }
 
     }
-
 
 
     public static void main(String[] args) throws InterruptedException {
@@ -737,29 +851,6 @@ public class Main {
         ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.7),
                 new Item("Lumber", 0.3))); //<-- 7:3 consumption rate, should force equilibrium
 
-        ArrayList<Item> inventoryA1 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA2 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA3 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA4 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA5 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA6 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA7 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA8 = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryA9 = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
-                new Item("Lumber", 3.0)));
-        ArrayList<Item> inventoryA10 = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
-                new Item("Lumber", 3.0)));
-
-
-
         // no SkillLevel code implemented, setting all to 1
         Profession fisherman = new Profession("Fisherman", 1.0, 1, 0.7);
         Profession lumberjack = new Profession("Lumberjack", 1.0, 1, 0.7);
@@ -769,39 +860,6 @@ public class Main {
         ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
                 new Priority("Fish", 1, 1, 1, -0.5, 0.35),
                 new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA1 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA2 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA3 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA4 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA5 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA6 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA7 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA8 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA9 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-        ArrayList<Priority> prioritiesA10 = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
-
-
-
 
         ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
                 new JobOutput("Lumberjack", "Lumber")));
@@ -809,21 +867,8 @@ public class Main {
                 new Price("Fish", 1.5, 2, 2),
                 new Price("Lumber", 3.5, 3, 3)));
         // Define Agents
-        /*
-        Agent a1 = new Agent("1", inventoryA1, prioritiesA1, consumption, lumberjack, 0, 0);
-        Agent a2 = new Agent("2", inventoryA2, prioritiesA2, consumption, lumberjack, 0, 0);
-        Agent a3 = new Agent("3", inventoryA3, prioritiesA3, consumption, lumberjack, 0, 0);
-        Agent a4 = new Agent("4", inventoryA4, prioritiesA4, consumption, lumberjack, 0, 0);
-        Agent a5 = new Agent("5", inventoryA5, prioritiesA5, consumption, lumberjack, 0, 0);
-        Agent a6 = new Agent("6", inventoryA6, prioritiesA6, consumption, lumberjack, 0, 0);
-        Agent a7 = new Agent("7", inventoryA7, prioritiesA7, consumption, lumberjack, 0, 0);
-        Agent a8 = new Agent("8", inventoryA8, prioritiesA8, consumption, lumberjack, 0, 0);
-        Agent a9 = new Agent("9", inventoryA9, prioritiesA9, consumption, lumberjack, 0, 0);
-        Agent a10 = new Agent("10", inventoryA10, prioritiesA10, consumption, lumberjack, 0, 0);
-         */
-
         // random number of agents
-        int numberOfAgents = (int) (70 * Math.random());
+        int numberOfAgents = (int) ((70 * Math.random()) + 5);
         int agentInitializer = 0;
         ArrayList<Agent> agents = new ArrayList<Agent>();
         int agentID = 1;
@@ -837,7 +882,7 @@ public class Main {
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, 0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
-                        new ArrayList<Item>(List.of (new Item("Fish", 0.7),
+                        new ArrayList<Item>(List.of (new Item("Fish", 0.75),
                                 new Item("Lumber", 0.3))),
                         new Profession("Lumberjack", 1.0, 1, 0.7), 0, 0));
             }
@@ -849,7 +894,7 @@ public class Main {
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, 0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
-                        new ArrayList<Item>(List.of (new Item("Fish", 0.7),
+                        new ArrayList<Item>(List.of (new Item("Fish", 0.65),
                                 new Item("Lumber", 0.3))),
                         new Profession("Fisherman", 1.0, 1, 0.7), 0, 0));
             }
@@ -1007,6 +1052,10 @@ class Profession {
     private double skillLevel;
     private double shortRunProduction;
     private double priceElasticityOfSupply;
+
+    // if deficiency in short run production vs market quantity, permit switch
+    // problem: market quantity higher than it is possible for any combination of agents to produce
+    // solution: derive production and demand curves from consumption and production /capacity/ of agents
 
     public Profession (String job, double skillLevel, double shortRunProduction, double priceElasticityOfSupply){
         this.job = job;
