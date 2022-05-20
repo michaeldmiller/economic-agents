@@ -81,17 +81,52 @@ public class Main {
                 break;
             }
         }
+
+        // major modification: variable production. Agent skill level is the maximum it can produce, if there is
+        // an oversupply, agent will reduce its own production down to within a variance of the market needs
+        // First step: determine if market is oversupplied:
+        double producedQuantity = 0;
+        if (market.getProductionDifference().get(goodType) > 0){
+            // if so, calculate factor by which market is overproducing
+            double overproductionFactor =
+                    market.getProductionDifference().get(goodType) / market.getMarketProduction().get(goodType);
+            // System.out.println("The production difference is: " + market.getProductionDifference().get(goodType));
+            // System.out.println("The market production is: " + market.getMarketProduction().get(goodType));
+            // System.out.println("The overproduction factor is: " + overproductionFactor);
+
+            // add variance to production factor (normal distribution, standard deviation of 7%
+            Random random = new Random();
+            double variance = random.nextGaussian(0,0.07);
+            // get agent base production (can change later to account for good types producing different quantities)
+            double baseProduction = agent.getProfession().getSkillLevel();
+            // combine factors
+            producedQuantity = baseProduction * (1 - (overproductionFactor + variance));
+            // prevent negative production
+            if (producedQuantity < 0){
+                producedQuantity = 0;
+            }
+            // System.out.println("Production Difference: " +  market.getProductionDifference().get(goodType));
+            // System.out.println("Market Production: " +  market.getMarketProduction().get(goodType));
+            // System.out.println("Produced Quantity: " + goodType + " " + producedQuantity);
+        }
+        // if market is not oversupplied, produce normally (i.e. at agent maximum)
+        else {
+            producedQuantity = agent.getProfession().getSkillLevel();
+            // System.out.println("Not oversupplied");
+        }
         // then have the Agent produce the Good (literally produces the amount of their skill level)
-        Item agentProduction = new Item (goodType, agent.getProfession().getSkillLevel());
+        Item agentProduction = new Item (goodType, producedQuantity);
         // compensate the Agent first (don't want agent's production to affect market price before the market has it)
         // find market price
         double currentPrice = 0;
         for (Price p : market.getPrices()){
-            if (p.getGood().equals(agentProduction.getGood())){
+            if (p.getGood().equals(goodType)){
                 currentPrice = p.getCost();
                 break;
             }
         }
+        agent.getProfession().setShortRunProduction(producedQuantity);
+
         // pay Agent if Market has money
         if (market.getMoney() > ((agentProduction.getQuantity()) * currentPrice)){
             market.setMoney(market.getMoney() - ((agentProduction.getQuantity()) * currentPrice));
@@ -100,6 +135,7 @@ public class Main {
             for (Item i : market.getInventory()){
                 if (i.getGood().equals(agentProduction.getGood())){
                     i.setQuantity(i.getQuantity() + agentProduction.getQuantity());
+
                 }
             }
         }
@@ -272,6 +308,25 @@ public class Main {
                 // remove good from goods and satisfactions list
                 goods.remove(index);
                 satisfactions.remove(index);
+
+                // since market can get caught in a situation where agents can be too poor to buy a good they
+                // really need, and cannot therefore fail to buy it and reduce satisfaction, create small
+                // satisfaction decrease if agent cannot afford to buy a good
+                // diminish production satisfaction of other goods
+                // find job title for the good
+                String jobTitle = "";
+                for (JobOutput j : m.getJobOutputs()){
+                    if (j.getGood().equals(chosenGood)){
+                        jobTitle = j.getJob();
+                        break;
+                    }
+                }
+                for (Agent agents : m.getAgents()){
+                    if (!a.getProfession().getJob().equals(jobTitle)){
+                        a.setSatisfaction(a.getSatisfaction() - 0.1);
+                    }
+                }
+
                 continue;
             }
             // if it can afford to buy its chosen good, see if the market doesn't have any to sell
@@ -522,6 +577,7 @@ public class Main {
             String agentGoodProduced = "";
             // * NOTE: the below line will not work if Agent production calculations are changed *
             double agentQuantityProduced = a.getProfession().getSkillLevel();
+            // System.out.println("Agent Quantity Produced: " + agentQuantityProduced);
             for (JobOutput j : market.getJobOutputs()){
                 if (j.getJob().equals(agentJob)){
                     agentGoodProduced = j.getGood();
@@ -535,6 +591,17 @@ public class Main {
                         cumulativeProduction.get(agentGoodProduced) + agentQuantityProduced);
             }
         }
+        market.setMarketConsumption(cumulativeConsumption);
+
+
+        // function can break if there is not an agent producing a good that is being consumed. Fix this
+        // by adding a zero production for all consumed goods which are not being produced
+        for (Map.Entry<String, Double> consumedGood : cumulativeConsumption.entrySet()){
+            if (!cumulativeProduction.containsKey(consumedGood.getKey())){
+                cumulativeProduction.put(consumedGood.getKey(), 0.0);
+            }
+        }
+        market.setMarketProduction(cumulativeProduction);
 
         // part 2: with cumulative consumption and production and consumption in hand, calculate difference:
         HashMap<String, Double> productionDifference = new HashMap<>();
@@ -546,8 +613,7 @@ public class Main {
             productionDifference.put(consumption.getKey(), amountProduced - amountConsumed);
         }
         // now set market consumption, production, and production difference fields for market
-        market.setMarketConsumption(cumulativeConsumption);
-        market.setMarketProduction(cumulativeProduction);
+
         market.setProductionDifference(productionDifference);
 
         // part 3: given production differences, affect satisfaction of agents accordingly
@@ -622,8 +688,8 @@ public class Main {
                     baseChance = 0;
                 }
                 // generate random number, pair with base chance, have agent switch professions if true
-                // should be 100, offset by base 1/250 chance, i.e. 25000
-                if ((Math.random() * 25000) < baseChance){
+                // should be 100, offset by base 1/10 chance, i.e. 1000
+                if ((Math.random() * 1000) < baseChance){
                     // Agent attempts to switch into a new profession
                     // make agent prioritise underutilized profession, make random weighted choice based on
                     // the size of the production deficit
@@ -728,7 +794,7 @@ public class Main {
         // Define Agents
         // random number of agents
         // int numberOfAgents = (int) ((70 * Math.random()) + 5);
-        int numberOfAgents = 1000;
+        int numberOfAgents = 75;
         int agentInitializer = 0;
         ArrayList<Agent> agents = new ArrayList<Agent>();
         int agentID = 1;
@@ -779,7 +845,7 @@ public class Main {
         int counterVar = 0;
         long startTime = System.currentTimeMillis();
 
-        while (counterVar < 1500){
+        while (counterVar < 500){
             runMarket(market, counterVar);
             counterVar++;
 
@@ -788,15 +854,31 @@ public class Main {
                 System.out.println(market.getInventory());
                 printJobs(market);
             }
-            /*
+
             if (counterVar % 100 == 0) {
                 System.out.println(market.getAgents());
             }
-            */
-            // Thread.sleep(50);
+            Thread.sleep(50);
+
+            /*
+            System.out.println(market.getPrices());
+            System.out.println(market.getInventory());
+            System.out.println("Production: " + market.getMarketProduction());
+            System.out.println("Consumption: " + market.getMarketConsumption());
+            System.out.println("Difference: " + market.getProductionDifference());
+            // System.out.println(market.getAgents());
+            printJobs(market);
+            Thread.sleep(50);
+
+             */
+
+
         }
+        System.out.println(market.getPrices());
+        System.out.println(market.getInventory());
+        printJobs(market);
         // System.out.println(market.getAgents());
-        System.out.println(market.getMoney());
+        // System.out.println(market.getMoney());
         long endTime = System.currentTimeMillis();
         System.out.println("Total time to run 1500 ticks in ms: " + (endTime - startTime));
 
