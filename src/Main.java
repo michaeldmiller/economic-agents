@@ -783,8 +783,8 @@ public class Main {
         // https://en.wikipedia.org/wiki/Price_elasticity_of_demand
         // Systematic approach to instantiating a market will have to be implemented in short order.
         ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, 0.15)));
+                new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
+                new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15)));
 
         ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
                 new JobOutput("Lumberjack", "Lumber")));
@@ -806,8 +806,8 @@ public class Main {
                         new ArrayList<Item>(List.of (new Item("Fish", 1.5),
                                 new Item("Lumber", 3.0))),
                         new ArrayList<Priority>(List.of(
-                                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                                new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
+                                new Priority("Fish", 1, 1, 1, -0.5, -0.5,  0.35),
+                                new Priority("Lumber", 1, 1, 1, -0.7,  -0.7, 0.15))),
                         new ArrayList<Item>(List.of (new Item("Fish", 0.75),
                                 new Item("Lumber", 0.3))),
                         new Profession("Lumberjack", 1.0, 1, 0.7), 0, 0));
@@ -818,8 +818,8 @@ public class Main {
                         new ArrayList<Item>(List.of (new Item("Fish", 2.0),
                                 new Item("Lumber", 2.0))),
                         new ArrayList<Priority>(List.of(
-                                new Priority("Fish", 1, 1, 1, -0.5, 0.35),
-                                new Priority("Lumber", 1, 1, 1, -0.7, 0.15))),
+                                new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
+                                new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15))),
                         new ArrayList<Item>(List.of (new Item("Fish", 0.65),
                                 new Item("Lumber", 0.3))),
                         new Profession("Fisherman", 1.0, 1, 0.7), 0, 0));
@@ -946,14 +946,17 @@ class Priority{
     private double relativeNeed;
     private double modifier;
     private double priceElasticity;
+    private double originalPriceElasticity;
     private double weight;
     public Priority (String good, double baseWeight, double relativeNeed,
-                     double modifier, double priceElasticity, double weight){
+                     double modifier, double priceElasticity, double originalPriceElasticity,
+                     double weight){
         this.good = good;
         this.baseWeight = baseWeight;
         this.relativeNeed = relativeNeed;
         this.modifier = modifier;
         this.priceElasticity = priceElasticity;
+        this.originalPriceElasticity = originalPriceElasticity;
         this.weight = weight;
     }
     public String getGood(){
@@ -970,6 +973,9 @@ class Priority{
     }
     public double getPriceElasticity(){
         return priceElasticity;
+    }
+    public double getOriginalPriceElasticity(){
+        return originalPriceElasticity;
     }
     public double getWeight(){
         return weight;
@@ -989,6 +995,9 @@ class Priority{
     public void setPriceElasticity(double newPriceElasticity){
         priceElasticity = newPriceElasticity;
     }
+    public void setOriginalPriceElasticity(double newOriginalPriceElasticity){
+        originalPriceElasticity = newOriginalPriceElasticity;
+    }
     public void setWeight(double newWeight){
         weight = newWeight;
     }
@@ -1002,7 +1011,111 @@ class Priority{
     }
 }
 
-// A 'Consumptions' is an Inventory
+// A 'Consumptions' is a HashMap of Consumption
+class Consumption {
+    private double tickConsumption;
+    private ArrayList<UnmetConsumption> unmetNeeds;
+    /*
+    private double status;
+    // slope * ln(status - offset) + intercept
+    private double slope;
+    private double offset;
+    private double intercept;
+    */
+
+    public Consumption(double tickConsumption, ArrayList<UnmetConsumption> unmetNeeds
+                        //, double status, double slope, double offset, double intercept
+                                                                    ){
+        this.tickConsumption = tickConsumption;
+        this.unmetNeeds = unmetNeeds;
+        /*
+        this.status = status;
+        this.slope = slope;
+        this.offset = offset;
+        this.intercept = intercept;
+        */
+    }
+
+    public double getTickConsumption(){
+        return tickConsumption;
+    }
+    public ArrayList<UnmetConsumption> getUnmetNeeds(){
+        return unmetNeeds;
+    }
+    /*
+    public double getStatus(){
+        return status;
+    }
+    public double getSlope(){
+        return slope;
+    }
+    public double getOffset(){
+        return offset;
+    }
+    public double getIntercept(){
+        return intercept;
+    }
+    */
+    public void setTickConsumption(double newTickConsumption){
+        tickConsumption = newTickConsumption;
+    }
+    public void setUnmetNeeds(ArrayList<UnmetConsumption> newUnmetNeeds){
+        unmetNeeds = newUnmetNeeds;
+    }
+    /*
+    public void setStatus(double newStatus){
+        status = newStatus;
+    }
+    public void setSlope(double newSlope){
+        slope = newSlope;
+    }
+    public void setOffset(double newOffset){
+        offset = newOffset;
+    }
+    public void setIntercept(double newIntercept){
+        intercept = newIntercept;
+    }
+    */
+    public String toString(){
+        return ("Tick Consumption: " + this.getTickConsumption() + ", " +
+                "Unmet Needs: " + this.getUnmetNeeds()
+                /*
+                + ", " + "Socioeconomic Status: " + this.getStatus() + ", " +
+                "Demand function slope: " + this.getSlope() + ", " +
+                "offset: " + this.getOffset() + ", " +
+                "intercept: " + this.getIntercept()
+                */
+                );
+    }
+
+
+}
+
+class UnmetConsumption {
+    private int ticksPassed;
+    private double missingQuantity;
+
+    public UnmetConsumption(int ticksPassed, double missingQuantity){
+        this.ticksPassed = ticksPassed;
+        this.missingQuantity = missingQuantity;
+    }
+
+    public int getTicksPassed(){
+        return ticksPassed;
+    }
+    public double getMissingQuantity(){
+        return missingQuantity;
+    }
+    public void setTicksPassed(int newTicksPassed){
+        ticksPassed = newTicksPassed;
+    }
+    public void setMissingQuantity(double newMissingQuantity){
+        missingQuantity = newMissingQuantity;
+    }
+    public String toString(){
+        return(this.getTicksPassed() + ", " + this.getMissingQuantity());
+    }
+}
 
 class Profession {
     private String job;
