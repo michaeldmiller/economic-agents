@@ -115,7 +115,7 @@ public class Main {
             // System.out.println("Not oversupplied");
         }
         // then have the Agent produce the Good (literally produces the amount of their skill level)
-        Item agentProduction = new Item (goodType, producedQuantity);
+        // Item agentProduction = new Item (goodType, producedQuantity);
         // compensate the Agent first (don't want agent's production to affect market price before the market has it)
         // find market price
         double currentPrice = 0;
@@ -127,19 +127,10 @@ public class Main {
         }
         agent.getProfession().setShortRunProduction(producedQuantity);
 
-        // pay Agent if Market has money
-        if (market.getMoney() > ((agentProduction.getQuantity()) * currentPrice)){
-            market.setMoney(market.getMoney() - ((agentProduction.getQuantity()) * currentPrice));
-            agent.setMoney(agent.getMoney() + ((agentProduction.getQuantity()) * currentPrice));
-            // deliver Good to Market
-            for (Item i : market.getInventory()){
-                if (i.getGood().equals(agentProduction.getGood())){
-                    i.setQuantity(i.getQuantity() + agentProduction.getQuantity());
-
-                }
-            }
-        }
-        // Note: Agent does not produce if Market cannot pay!
+        // pay Agent
+        agent.setMoney(agent.getMoney() + (producedQuantity * currentPrice));
+        // send good to market
+        market.getInventory().put(goodType, market.getInventory().get(goodType) + producedQuantity);
 
     }
 
@@ -158,32 +149,23 @@ public class Main {
 
     static void agentConsume (Agent a, Market m){
         for (Map.Entry<String, Consumption> agentConsumption: a.getConsumption().entrySet()){
-            Item newItem = new Item("", 0);
-            int index = 0;
-            for (Item i : a.getInventory()) {
-                if (i.getGood().equals(agentConsumption.getKey())) {
-                    newItem = new Item(agentConsumption.getKey(),
-                            i.getQuantity() - agentConsumption.getValue().getTickConsumption());
-                    break;
-                }
-                index++;
-            }
+            a.getInventory().put(agentConsumption.getKey(),
+                    a.getInventory().get(agentConsumption.getKey()) - agentConsumption.getValue().getTickConsumption());
 
             // now protect against negatives and set need modifier
-            if (newItem.getQuantity() <= 0){
-                newItem.setQuantity(0);
+            if (a.getInventory().get(agentConsumption.getKey()) <= 0){
+                a.getInventory().put(agentConsumption.getKey(), 0.0);
                 for (Priority p : a.getPriorities()){
-                    if (p.getGood().equals(newItem.getGood())){
+                    if (p.getGood().equals(agentConsumption.getKey())){
                         // add cumulative need effect
                         p.setModifier(p.getRelativeNeed() * 1.5 + (0.1 * p.getModifier()));
                     }
                 }
             }
-            a.getInventory().set(index, newItem);
             // reset modifier if agent has successfully acquired a sufficient amount of the good
-            if (a.getInventory().get(index).getQuantity() >= 1){
+            if (a.getInventory().get(agentConsumption.getKey()) >= 1){
                 for (Priority p : a.getPriorities()){
-                    if (p.getGood().equals(newItem.getGood())){
+                    if (p.getGood().equals(agentConsumption.getKey())){
                         p.setModifier(1.0);
                     }
                 }
@@ -241,13 +223,7 @@ public class Main {
             double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
 
             // add decreasing marginal utility
-            double amountInInventory = 0;
-            for (Item i : a.getInventory()) {
-                if (i.getGood().equals(p.getGood())) {
-                    amountInInventory = i.getQuantity();
-                    break;
-                }
-            }
+            double amountInInventory = a.getInventory().get(p.getGood());
             double decreasingMarginalUtility = 1;
             if (amountInInventory > (5 * consumedQuantity)){
                 decreasingMarginalUtility = (((amountInInventory - (5 * consumedQuantity))
@@ -339,12 +315,8 @@ public class Main {
                 continue;
             }
             // if it can afford to buy its chosen good, see if the market doesn't have any to sell
-            double availableQuantity = 0;
-            for (Item i : m.getInventory()) {
-                if (i.getGood().equals(chosenGood)) {
-                    availableQuantity = i.getQuantity();
-                }
-            }
+            double availableQuantity = m.getInventory().get(chosenGood);
+
             if (availableQuantity < 1) {
                 // find index of good
                 int index = 0;
@@ -397,51 +369,16 @@ public class Main {
             a.setMoney(a.getMoney() - chosenGoodPrice);
             m.setMoney(m.getMoney() + chosenGoodPrice);
             // remove good from Market's inventory:
-            for (Item i : m.getInventory()){
-                // System.out.println("removing from inventory");
-                if (i.getGood().equals(chosenGood)){
-                    i.setQuantity(i.getQuantity() - 1);
-                    break;
-                }
-            }
+            // can change purchase amount later
+            double purchaseAmount = 1;
+            m.getInventory().put(chosenGood, m.getInventory().get(chosenGood) - purchaseAmount);
+
             // add good to Agent's inventory
-            for (Item t : a.getInventory()){
-                if (t.getGood().equals(chosenGood)) {
-                    t.setQuantity(t.getQuantity() + 1);
-                    break;
-                }
-            }
+            a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + purchaseAmount);
+
             // To Do : Fix Pricing!!!
             // Problem: Agent can sell and not buy
-            // This creates money out of thin air and oversupply on the market
-            // If we need a perfectly closed system, keep track of buying and selling choices and
-            // only reward an Agent with money if it buys.
-            // If we want a partially closed system, we need to keep track of how much money the market has,
-            // Agents are paid out of the market's money supply
-            /*
-            // alter price!
-            // determine weight of the agent
-            double agentImportance = 1.0 / m.getAgents().size();
-            // increase price by agentImportance * equilibriumPrice
-            for (Price c : m.getPrices())
-                if (c.getGood().equals(chosenGood)) {
-                    c.setCost(c.getCost() + (Math.abs (agentImportance * 0.1 * c.getOriginalCost())));
-                }
-
-            */
-
-            /*
-            for (Item marketItem : m.getInventory()){
-                // crude version of production
-                if (marketItem.getQuantity() > (10 * m.getAgents().size())) {
-                    for (Price r : m.getPrices()){
-                        if (r.getGood().equals(marketItem.getGood())){
-                            r.setCost(0.99 * r.getCost());
-                        }
-                    }
-                }
-            }
-             */
+            // Fix method: remembering unmet consumption needs
 
             notPurchased = false;
             break;
@@ -454,29 +391,6 @@ public class Main {
         }
     }
 
-
-    // print jobs
-    static void printJobs (Market market){
-        HashMap<String, Integer> jobsTotal = new HashMap<String, Integer>();
-        for (Agent a : market.getAgents()){
-            if (!jobsTotal.containsKey(a.getProfession().getJob())){
-                jobsTotal.put(a.getProfession().getJob(), 1);
-            }
-            else {
-                String key = a.getProfession().getJob();
-                jobsTotal.put(key, jobsTotal.get(key) + 1);
-            }
-        }
-        System.out.println(jobsTotal);
-    }
-
-    static void printMoney (Market market){
-        double totalMoney = market.getMoney();
-        for (Agent a : market.getAgents()){
-            totalMoney = totalMoney + a.getMoney();
-        }
-        System.out.println(totalMoney);
-    }
 
     static void marketPrices (Market market){
         // given a Market, calculate the Supply and Demand equilibrium for each good, then
@@ -656,13 +570,8 @@ public class Main {
 
             // check if market is flooded, otherwise reward the agent
             // get market inventory
-            double marketInventory = 0;
-            for (Item marketGood : market.getInventory()){
-                if (marketGood.getGood().equals(difference.getKey())){
-                    marketInventory = marketGood.getQuantity();
-                    break;
-                }
-            }
+            double marketInventory = market.getInventory().get(difference.getKey());
+
             // market is not flooded if it has less than 10 times the sum of the Agents per tick consumption on hand.
             if (marketInventory < (10 * cumulativeConsumption.get(difference.getKey()))){
                 // if the market isn't flooded, reward producers of the good by increasing their satisfaction
@@ -738,6 +647,28 @@ public class Main {
         }
     }
 
+    // print jobs
+    static void printJobs (Market market){
+        HashMap<String, Integer> jobsTotal = new HashMap<String, Integer>();
+        for (Agent a : market.getAgents()){
+            if (!jobsTotal.containsKey(a.getProfession().getJob())){
+                jobsTotal.put(a.getProfession().getJob(), 1);
+            }
+            else {
+                String key = a.getProfession().getJob();
+                jobsTotal.put(key, jobsTotal.get(key) + 1);
+            }
+        }
+        System.out.println(jobsTotal);
+    }
+
+    static void printMoney (Market market){
+        double totalMoney = market.getMoney();
+        for (Agent a : market.getAgents()){
+            totalMoney = totalMoney + a.getMoney();
+        }
+        System.out.println(totalMoney);
+    }
 
     // master controller function
     static void runMarket (Market market, int counter) throws InterruptedException {
@@ -780,14 +711,12 @@ public class Main {
         // ArrayList of Prices: (Fish, 1.5, 2, 2); (Lumber 3.5, 3, 3) <- Fish oversupplied, in testing try to get
         //      an agent to switch professions so the price returns to equilibrium.
 
-        ArrayList<Item> inventoryFish = new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> inventoryLumber = new ArrayList<Item>(List.of (new Item("Fish", 1.5),
-                new Item("Lumber", 3.0)));
-        ArrayList<Item> inventoryMarket = new ArrayList<Item>(List.of (new Item("Fish", 10.0),
-                new Item("Lumber", 2.0)));
-        ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.7),
-                new Item("Lumber", 0.3))); //<-- 7:3 consumption rate, should force equilibrium
+
+
+        HashMap<String, Double> inventoryMarket = new HashMap<String, Double>();
+        inventoryMarket.put("Fish", 10.0);
+        inventoryMarket.put("Lumber", 10.0);
+        // 7:3 consumption rate, should force equilibrium
         HashMap<String, Consumption> newConsumption = new HashMap<String, Consumption>();
         newConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
         newConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
@@ -822,10 +751,13 @@ public class Main {
                 HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
                 agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
                 agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
+                // create inventory
+                HashMap<String, Double> agentInventory = new HashMap<String, Double>();
+                agentInventory.put("Fish", 3.0);
+                agentInventory.put("Lumber", 2.0);
 
                 agents.add(new Agent(Integer.toString(agentID),
-                        new ArrayList<Item>(List.of (new Item("Fish", 1.5),
-                                new Item("Lumber", 3.0))),
+                        agentInventory,
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, -0.5,  0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7,  -0.7, 0.15))),
@@ -838,9 +770,12 @@ public class Main {
                 agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
                 agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
 
+                HashMap<String, Double> agentInventory = new HashMap<String, Double>();
+                agentInventory.put("Fish", 3.0);
+                agentInventory.put("Lumber", 2.0);
+
                 agents.add(new Agent(Integer.toString(agentID),
-                        new ArrayList<Item>(List.of (new Item("Fish", 2.0),
-                                new Item("Lumber", 2.0))),
+                        agentInventory,
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15))),
@@ -894,8 +829,6 @@ public class Main {
             Thread.sleep(50);
 
              */
-
-
         }
         System.out.println(market.getPrices());
         System.out.println(market.getInventory());
@@ -932,7 +865,8 @@ class ChoiceWeight {
 }
 
 // First, define the classes needed for an Agent:
-// An Inventory is an ArrayList of Item
+// An Inventory is a HashMap of String and Double
+/*
 class Item {
     // Variable Instantiation
     private String good;
@@ -961,6 +895,7 @@ class Item {
         return(this.getGood() + ", " + this.getQuantity());
     }
 }
+ */
 
 // A 'Priorities' is an ArrayList of Priority
 class Priority{
@@ -1030,6 +965,7 @@ class Priority{
                 "relative need: " + this.getRelativeNeed() + ", " +
                 "modifier: " + this.getModifier() + ", " +
                 "price elasticity: " + this.getPriceElasticity() + ", " +
+                "original price elasticity: " + this.getOriginalPriceElasticity() + ", " +
                 "final weight: " + this.getWeight() + ".");
     }
 }
@@ -1190,14 +1126,14 @@ class Profession {
 
 class Agent {
     private String id;
-    private ArrayList<Item> inventory;
+    private HashMap<String, Double> inventory;
     private ArrayList<Priority> priorities;
     private HashMap<String, Consumption> consumption;
     private Profession profession;
     private double money;
     private double satisfaction;
 
-    public Agent (String id, ArrayList<Item> inventory, ArrayList<Priority> priorities,
+    public Agent (String id, HashMap<String, Double> inventory, ArrayList<Priority> priorities,
                   HashMap<String, Consumption> consumption, Profession profession, double money,
                   double satisfaction){
         this.id = id;
@@ -1211,7 +1147,7 @@ class Agent {
     public String getId(){
         return id;
     }
-    public ArrayList<Item> getInventory(){
+    public HashMap<String, Double> getInventory(){
         return inventory;
     }
     public ArrayList<Priority> getPriorities(){
@@ -1232,7 +1168,7 @@ class Agent {
     public void setId(String newID){
         id = newID;
     }
-    public void setInventory(ArrayList<Item> newInventory){
+    public void setInventory(HashMap<String, Double> newInventory){
         inventory = newInventory;
     }
     public void setPriorities(ArrayList<Priority> newPriorities){
@@ -1330,7 +1266,7 @@ class Price{
 
 class Market {
     private ArrayList<Agent> agents;
-    private ArrayList<Item> inventory;
+    private HashMap<String, Double> inventory;
     private ArrayList<JobOutput> jobOutputs;
     private ArrayList<Price> prices;
     private HashMap<String, Double> marketConsumption;
@@ -1338,7 +1274,7 @@ class Market {
     private HashMap<String, Double> productionDifference;
     private double money;
 
-    public Market(ArrayList<Agent> agents, ArrayList<Item> inventory, ArrayList<JobOutput> jobOutputs,
+    public Market(ArrayList<Agent> agents, HashMap<String, Double> inventory, ArrayList<JobOutput> jobOutputs,
                   ArrayList<Price> prices, HashMap<String, Double> marketConsumption,
                   HashMap<String, Double> marketProduction, HashMap<String, Double> productionDifference, double money){
         this.agents = agents;
@@ -1353,7 +1289,7 @@ class Market {
     public ArrayList<Agent> getAgents(){
         return agents;
     }
-    public ArrayList<Item> getInventory(){
+    public HashMap<String, Double> getInventory(){
         return inventory;
     }
     public ArrayList<JobOutput> getJobOutputs(){
@@ -1377,7 +1313,7 @@ class Market {
     public void setAgents(ArrayList<Agent> newAgents){
         agents = newAgents;
     }
-    public void setInventory(ArrayList<Item> newInventory){
+    public void setInventory(HashMap<String, Double> newInventory){
         inventory = newInventory;
     }
     public void setJobOutputs(ArrayList<JobOutput> newJobOutputs){
