@@ -157,9 +157,18 @@ public class Main {
     // the relative need
 
     static void agentConsume (Agent a, Market m){
-        for (int i = 0; (i < a.getConsumption().size()); i++ ){
-            Item newItem = new Item(a.getInventory().get(i).getGood(),
-                    (a.getInventory().get(i).getQuantity() - a.getConsumption().get(i).getQuantity()));
+        for (Map.Entry<String, Consumption> agentConsumption: a.getConsumption().entrySet()){
+            Item newItem = new Item("", 0);
+            int index = 0;
+            for (Item i : a.getInventory()) {
+                if (i.getGood().equals(agentConsumption.getKey())) {
+                    newItem = new Item(agentConsumption.getKey(),
+                            i.getQuantity() - agentConsumption.getValue().getTickConsumption());
+                    break;
+                }
+                index++;
+            }
+
             // now protect against negatives and set need modifier
             if (newItem.getQuantity() <= 0){
                 newItem.setQuantity(0);
@@ -170,9 +179,9 @@ public class Main {
                     }
                 }
             }
-            a.getInventory().set(i, newItem);
+            a.getInventory().set(index, newItem);
             // reset modifier if agent has successfully acquired a sufficient amount of the good
-            if (a.getInventory().get(i).getQuantity() >= 1){
+            if (a.getInventory().get(index).getQuantity() >= 1){
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(newItem.getGood())){
                         p.setModifier(1.0);
@@ -220,9 +229,9 @@ public class Main {
             // combine with elasticity, set relative need
             // get consumption
             double consumedQuantity = 0;
-            for (Item c : a.getConsumption()){
-                if (c.getGood().equals(p.getGood())){
-                    consumedQuantity = c.getQuantity();
+            for (Map.Entry<String, Consumption> c : a.getConsumption().entrySet()){
+                if (c.getKey().equals(p.getGood())){
+                    consumedQuantity = c.getValue().getTickConsumption();
                     break;
                 }
             }
@@ -509,11 +518,13 @@ public class Main {
                     }
                 }
                 // add demand intercept to sum
-                for (Item i : a.getConsumption()){
-                    if (i.getGood().equals(p.getGood())){
-                        sumDemandIntercept = sumDemandIntercept + (i.getQuantity() * 10);
+                for (Map.Entry<String, Consumption> c : a.getConsumption().entrySet()) {
+                    if (c.getKey().equals(p.getGood())) {
+                        sumDemandIntercept = sumDemandIntercept + (c.getValue().getTickConsumption() * 10);
+                        break;
                     }
                 }
+
                 supplySum = supplySum + a.getProfession().getPriceElasticityOfSupply();
                 // good minimum not dealt with, all production has 0 minimum across all Agents
 
@@ -563,13 +574,15 @@ public class Main {
 
         for (Agent a : market.getAgents()){
             // get agent consumptions, store in consumption hash map
-            for (Item i : a.getConsumption()){
-                if (!cumulativeConsumption.containsKey(i.getGood())){
-                    cumulativeConsumption.put(i.getGood(), i.getQuantity());
+            for (Map.Entry<String, Consumption> agentConsumption : a.getConsumption().entrySet()){
+                if (!cumulativeConsumption.containsKey(agentConsumption.getKey())){
+                    cumulativeConsumption.put(agentConsumption.getKey(),
+                            agentConsumption.getValue().getTickConsumption());
                 }
                 else {
-                    String key = i.getGood();
-                    cumulativeConsumption.put(key, cumulativeConsumption.get(key) + i.getQuantity());
+                    String key = agentConsumption.getKey();
+                    cumulativeConsumption.put(key, cumulativeConsumption.get(key) +
+                            agentConsumption.getValue().getTickConsumption());
                 }
             }
             // get agent production, store in production hash map
@@ -775,6 +788,9 @@ public class Main {
                 new Item("Lumber", 2.0)));
         ArrayList<Item> consumption = new ArrayList<Item>(List.of (new Item("Fish", 0.7),
                 new Item("Lumber", 0.3))); //<-- 7:3 consumption rate, should force equilibrium
+        HashMap<String, Consumption> newConsumption = new HashMap<String, Consumption>();
+        newConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
+        newConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
 
         // no SkillLevel code implemented, setting all to 1
         Profession fisherman = new Profession("Fisherman", 1.0, 1, 0.7);
@@ -794,7 +810,7 @@ public class Main {
         // Define Agents
         // random number of agents
         // int numberOfAgents = (int) ((70 * Math.random()) + 5);
-        int numberOfAgents = 75;
+        int numberOfAgents = 10;
         int agentInitializer = 0;
         ArrayList<Agent> agents = new ArrayList<Agent>();
         int agentID = 1;
@@ -802,26 +818,33 @@ public class Main {
             double jobChoice = Math.random();
             // Lumberjack 90% of the time (intentionally out of equilibrium)
             if (jobChoice < 0.9){
+                // create consumption
+                HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
+                agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
+                agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
+
                 agents.add(new Agent(Integer.toString(agentID),
                         new ArrayList<Item>(List.of (new Item("Fish", 1.5),
                                 new Item("Lumber", 3.0))),
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, -0.5,  0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7,  -0.7, 0.15))),
-                        new ArrayList<Item>(List.of (new Item("Fish", 0.75),
-                                new Item("Lumber", 0.3))),
+                        agentConsumption,
                         new Profession("Lumberjack", 1.0, 1, 0.7), 0, 0));
             }
             // otherwise Fisherman
             else{
+                HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
+                agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
+                agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
+
                 agents.add(new Agent(Integer.toString(agentID),
                         new ArrayList<Item>(List.of (new Item("Fish", 2.0),
                                 new Item("Lumber", 2.0))),
                         new ArrayList<Priority>(List.of(
                                 new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
                                 new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15))),
-                        new ArrayList<Item>(List.of (new Item("Fish", 0.65),
-                                new Item("Lumber", 0.3))),
+                        agentConsumption,
                         new Profession("Fisherman", 1.0, 1, 0.7), 0, 0));
             }
             agentInitializer++;
@@ -1169,13 +1192,13 @@ class Agent {
     private String id;
     private ArrayList<Item> inventory;
     private ArrayList<Priority> priorities;
-    private ArrayList<Item> consumption;
+    private HashMap<String, Consumption> consumption;
     private Profession profession;
     private double money;
     private double satisfaction;
 
     public Agent (String id, ArrayList<Item> inventory, ArrayList<Priority> priorities,
-                  ArrayList<Item> consumption, Profession profession, double money,
+                  HashMap<String, Consumption> consumption, Profession profession, double money,
                   double satisfaction){
         this.id = id;
         this.inventory = inventory;
@@ -1194,7 +1217,7 @@ class Agent {
     public ArrayList<Priority> getPriorities(){
         return priorities;
     }
-    public ArrayList<Item> getConsumption(){
+    public HashMap<String, Consumption> getConsumption(){
         return consumption;
     }
     public Profession getProfession(){
@@ -1215,7 +1238,7 @@ class Agent {
     public void setPriorities(ArrayList<Priority> newPriorities){
         priorities = newPriorities;
     }
-    public void setConsumption(ArrayList<Item> newConsumption){
+    public void setConsumption(HashMap<String, Consumption> newConsumption){
         consumption = newConsumption;
     }
     public void setProfession(Profession newProfession){
