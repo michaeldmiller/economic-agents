@@ -219,6 +219,18 @@ public class Main {
     static void agentPriorities (Agent a, Market m){
         // calculate current relative demand based on elasticity
         for (Priority p : a.getPriorities()){
+            // change demand elasticity based on sum of remembered unmet consumption
+            double totalUnmetNeed = 0;
+            for (UnmetConsumption u : a.getConsumption().get(p.getGood()).getUnmetNeeds()){
+                totalUnmetNeed += u.getMissingQuantity();
+            }
+            // set need ratio at 0.05 * (total unmet need / per tick consumption)
+            double unmetNeedRatio = totalUnmetNeed / a.getConsumption().get(p.getGood()).getTickConsumption();
+            // y = -1 * (1 / unmetNeedRatio * original elasticity inverse)
+            // (sets decay with y intercept at original elasticity)
+            p.setPriceElasticity(-1 * (1 / ((0.1 * unmetNeedRatio) +
+                    (Math.pow(Math.abs(p.getOriginalPriceElasticity()), -1)))));
+
             // get market values (may get market average here later)
             double currentMarketCost = 0;
             double currentEquilibriumCost = 0;
@@ -494,7 +506,7 @@ public class Main {
             // double goodPrice = (sumDemandIntercept - numOfProducers) / (0 - demandSum);
             double goodPrice = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum);
 
-            p.setEquilibriumCost(goodPrice);
+            p.setEquilibriumCost(goodPrice * p.getOriginalCost());
 
             // calculate market quantity
             // now, given P, calculate Q
@@ -760,8 +772,8 @@ public class Main {
         ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
                 new JobOutput("Lumberjack", "Lumber")));
         ArrayList<Price> marketPrices = new ArrayList<Price>(List.of(
-                new Price("Fish", 1.5, 2, 2),
-                new Price("Lumber", 3.5, 3, 3)));
+                new Price("Fish", 1.5, 2, 10),
+                new Price("Lumber", 3.5, 3, 25)));
         // Define Agents
         // random number of agents
         // int numberOfAgents = (int) ((70 * Math.random()) + 5);
