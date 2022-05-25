@@ -149,11 +149,43 @@ public class Main {
 
     static void agentConsume (Agent a, Market m){
         for (Map.Entry<String, Consumption> agentConsumption: a.getConsumption().entrySet()){
+            // handle unmet needs, if they exist
+            for (int i = 0; i < a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().size(); i++){
+                UnmetConsumption u = a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().get(i);
+                u.setTicksPassed(u.getTicksPassed() + 1);
+
+                // simulate forgetting past unmet needs
+                // if memory is 50 ticks old, begin reducing quantity
+                if (u.getTicksPassed() >= 50){
+                    u.setMissingQuantity(u.getMissingQuantity() - 0.01);
+                }
+
+                // if memory is more than 100 ticks old, reduce faster
+                if (u.getTicksPassed() >= 100){
+                    u.setMissingQuantity(u.getMissingQuantity() - 0.04);
+                }
+
+                // remove memory if quantity dips to or below 0
+                if (u.getMissingQuantity() <= 0) {
+                    a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().remove(u);
+                }
+            }
+
+            double currentInventoryAmount = a.getInventory().get(agentConsumption.getKey());
+            double newInventoryAmount = currentInventoryAmount - agentConsumption.getValue().getTickConsumption();
+
             a.getInventory().put(agentConsumption.getKey(),
                     a.getInventory().get(agentConsumption.getKey()) - agentConsumption.getValue().getTickConsumption());
+            // handle negatives: add an unmet consumption need to the list
+            if (newInventoryAmount < 0){
+                double shortage = currentInventoryAmount - newInventoryAmount;
+                // prevent rounding error shortages from being counted
+                if (Math.abs(shortage) > 0.01){
+                    // add new unmet need to corresponding entry in agent's consumptions
+                    a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds()
+                            .add(new UnmetConsumption(0, shortage));
 
-            // now protect against negatives and set need modifier
-            if (a.getInventory().get(agentConsumption.getKey()) <= 0){
+                }
                 a.getInventory().put(agentConsumption.getKey(), 0.0);
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(agentConsumption.getKey())){
@@ -185,12 +217,6 @@ public class Main {
     // second which makes actual purchasing decision
 
     static void agentPriorities (Agent a, Market m){
-        // thanks to inclusion of elasticity field in priorities, this is relatively simple, but subject
-        // to outside intervention: the given elasticity value must be ~generally correct~ in order for this to
-        // act correctly, as it is not generated from within. Thankfully, there are economic studies which reveal
-        // actual real-world price elasticity values, but whether this translates correctly to this model is
-        // currently unknown
-
         // calculate current relative demand based on elasticity
         for (Priority p : a.getPriorities()){
             // get market values (may get market average here later)
@@ -866,36 +892,6 @@ class ChoiceWeight {
 
 // First, define the classes needed for an Agent:
 // An Inventory is a HashMap of String and Double
-/*
-class Item {
-    // Variable Instantiation
-    private String good;
-    private double quantity;
-    // Constructor
-    public Item (String good, double quantity){
-        this.good = good;
-        this.quantity = quantity;
-    }
-    // Accessors
-    public String getGood(){
-        return good;
-    }
-    public double getQuantity(){
-        return quantity;
-    }
-    // Mutators
-    public void setGood(String newGood){
-        good = newGood;
-    }
-    public void setQuantity(double newQuantity){
-        quantity = newQuantity;
-    }
-    // Override of toString to make it useful
-    public String toString(){
-        return(this.getGood() + ", " + this.getQuantity());
-    }
-}
- */
 
 // A 'Priorities' is an ArrayList of Priority
 class Priority{
