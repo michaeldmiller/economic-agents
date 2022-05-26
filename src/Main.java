@@ -648,8 +648,8 @@ public class Main {
                     baseChance = 0;
                 }
                 // generate random number, pair with base chance, have agent switch professions if true
-                // should be 100, offset by base 1/10 chance, i.e. 1000
-                if ((Math.random() * 1000) < baseChance){
+                // should be 100, offset by base 1/100 chance, i.e. 10000
+                if ((Math.random() * 10000) < baseChance){
                     // Agent attempts to switch into a new profession
                     // make agent prioritise underutilized profession, make random weighted choice based on
                     // the size of the production deficit
@@ -732,109 +732,105 @@ public class Main {
     }
 
 
-    public static void main(String[] args) throws InterruptedException {
-        // Create a test Market, to ensure that classes have been created correctly.
-        // In principle, I intend to test this system on a Market with 10 Agents and 2 Goods,
-        // Fish and Lumber, respectively.
-
-        // Agent Needs:
-        // a Priorities default for Fishermen and Lumberjack Agents and a Consumptions default for each type.
-        // A Profession and skill level for each (will set SkillLevel to 1 for now)
-        // Basic defaults: generation of ID String ("1" - "10"), empty inventory, 10 money to start, 0 satisfaction
-        // 8 Fishermen, 2 Lumberjacks to start, equilibrium 7 Fishermen, 3 Lumberjacks
-
-        // Market Needs:
-        // compile agents 1-10 into an ArrayList, basic empty default inventory
-        // ArrayList of JobTypes: Fisherman -> Fish, Lumberjack -> Lumber
-        // ArrayList of Prices: (Fish, 1.5, 2, 2); (Lumber 3.5, 3, 3) <- Fish oversupplied, in testing try to get
-        //      an agent to switch professions so the price returns to equilibrium.
-
-
-
-        HashMap<String, Double> inventoryMarket = new HashMap<String, Double>();
-        inventoryMarket.put("Fish", 10.0);
-        inventoryMarket.put("Lumber", 10.0);
-        // 7:3 consumption rate, should force equilibrium
-        HashMap<String, Consumption> newConsumption = new HashMap<String, Consumption>();
-        newConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
-        newConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
-
-        // no SkillLevel code implemented, setting all to 1
-        Profession fisherman = new Profession("Fisherman", 1.0, 1, 0.7);
-        Profession lumberjack = new Profession("Lumberjack", 1.0, 1, 0.7);
-        // All Agents have the same priorities
-        // https://en.wikipedia.org/wiki/Price_elasticity_of_demand
-        // Systematic approach to instantiating a market will have to be implemented in short order.
-        ArrayList<Priority> priorities = new ArrayList<Priority>(List.of(
-                new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
-                new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15)));
-
-        ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>(List.of(new JobOutput("Fisherman", "Fish"),
-                new JobOutput("Lumberjack", "Lumber")));
-        ArrayList<Price> marketPrices = new ArrayList<Price>(List.of(
-                new Price("Fish", 1.5, 2, 10),
-                new Price("Lumber", 3.5, 3, 25)));
-        // Define Agents
-        // random number of agents
-        // int numberOfAgents = (int) ((70 * Math.random()) + 5);
-        int numberOfAgents = 10;
-        int agentInitializer = 0;
+    static ArrayList<Agent> makeAgents(ArrayList<MarketInfo> marketProfile, int numberOfAgents){
+        // given information about the characteristics of a market and a number of agents, produce a list of agents
+        // for that market
         ArrayList<Agent> agents = new ArrayList<Agent>();
         int agentID = 1;
-        while (agentInitializer < numberOfAgents){
-            double jobChoice = Math.random();
-            // Lumberjack 90% of the time (intentionally out of equilibrium)
-            if (jobChoice < 0.9){
-                // create consumption
-                HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
-                agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
-                agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
-                // create inventory
-                HashMap<String, Double> agentInventory = new HashMap<String, Double>();
-                agentInventory.put("Fish", 3.0);
-                agentInventory.put("Lumber", 2.0);
 
-                agents.add(new Agent(Integer.toString(agentID),
-                        agentInventory,
-                        new ArrayList<Priority>(List.of(
-                                new Priority("Fish", 1, 1, 1, -0.5, -0.5,  0.35),
-                                new Priority("Lumber", 1, 1, 1, -0.7,  -0.7, 0.15))),
-                        agentConsumption,
-                        new Profession("Lumberjack", 1.0, 1, 0.7), 0, 0));
+        while (agentID <= numberOfAgents){
+            HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
+            HashMap<String, Double> agentInventory = new HashMap<String, Double>();
+            ArrayList<Priority> agentPriorities = new ArrayList<Priority>();
+
+            ArrayList<String> professionChoices = new ArrayList<String>();
+            ArrayList<Integer> professionWeights = new ArrayList<Integer>();
+
+            Random random = new Random();
+            // add good consumptions, inventory, and priorities
+            for (MarketInfo marketInfo : marketProfile){
+                // put base consumption with variance (standard deviation 7%)
+                double consumptionVariance = 1 + random.nextGaussian(0,0.07);
+                agentConsumption.put(marketInfo.getGood(), new Consumption(marketInfo.getBaseConsumption()
+                        * consumptionVariance, new ArrayList<>()));
+                // put 5 * base good consumption of good in agent's inventory
+                agentInventory.put(marketInfo.getGood(), 5 * marketInfo.getBaseConsumption());
+                // add good priority to agent with variance (standard deviation 2.5%)
+                double demandElasticityVariance = 1 + random.nextGaussian(0,0.025);
+                double demandElasticity = marketInfo.getPriceElasticityDemand() * demandElasticityVariance;
+                agentPriorities.add(new Priority(marketInfo.getGood(), marketInfo.getPriorityBaseWeight(),
+                        1, 1, demandElasticity, demandElasticity,  1));
+                professionChoices.add(marketInfo.getGood());
+                professionWeights.add((int) (marketInfo.getJobChance() * 100));
             }
-            // otherwise Fisherman
-            else{
-                HashMap<String, Consumption> agentConsumption = new HashMap<String, Consumption>();
-                agentConsumption.put("Fish", new Consumption(0.7, new ArrayList<>()));
-                agentConsumption.put("Lumber", new Consumption(0.3, new ArrayList<>()));
-
-                HashMap<String, Double> agentInventory = new HashMap<String, Double>();
-                agentInventory.put("Fish", 3.0);
-                agentInventory.put("Lumber", 2.0);
-
-                agents.add(new Agent(Integer.toString(agentID),
-                        agentInventory,
-                        new ArrayList<Priority>(List.of(
-                                new Priority("Fish", 1, 1, 1, -0.5, -0.5, 0.35),
-                                new Priority("Lumber", 1, 1, 1, -0.7, -0.7, 0.15))),
-                        agentConsumption,
-                        new Profession("Fisherman", 1.0, 1, 0.7), 0, 0));
+            // pick profession
+            String professionPick = randomWeightedPick(professionChoices, professionWeights);
+            Profession agentProfession = new Profession("", 1, 1, 1);
+            double startingMoney = 0;
+            for (MarketInfo marketInfoRound2 : marketProfile) {
+                if (marketInfoRound2.getGood().equals(professionPick)){
+                    agentProfession.setJob(marketInfoRound2.getJobName());
+                    double supplyElasticityVariance = 1 + random.nextGaussian(0,0.025);
+                    agentProfession.setPriceElasticityOfSupply(marketInfoRound2.getPriceElasticitySupply()
+                            * supplyElasticityVariance);
+                    startingMoney = marketInfoRound2.getGoodCost();
+                }
             }
-            agentInitializer++;
+            agents.add(new Agent(Integer.toString(agentID), agentInventory, agentPriorities, agentConsumption,
+                    agentProfession, startingMoney, 0));
             agentID++;
-
         }
+
+        return agents;
+    }
+
+    static Market makeMarket(ArrayList<MarketInfo> marketProfile, ArrayList<Agent> marketAgents){
+        HashMap<String, Double> marketInventory = new HashMap<String, Double>();
+        ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>();
+        ArrayList<Price> marketPrices = new ArrayList<Price>();
+
+        for (MarketInfo marketInfo : marketProfile){
+            marketInventory.put(marketInfo.getGood(), (double) marketAgents.size());
+            marketJobs.add(new JobOutput(marketInfo.getJobName(), marketInfo.getGood()));
+            marketPrices.add(new Price(marketInfo.getGood(), marketInfo.getGoodCost(),
+                    marketInfo.getGoodCost(), marketInfo.getGoodCost()));
+        }
+
         // empty market production, consumption, and production difference fields, will be reset by the first call
         // to marketProductionSatisfaction
         HashMap<String, Double> cumulativeMarketConsumption = new HashMap<String, Double>();
         HashMap<String, Double> cumulativeMarketProduction = new HashMap<String, Double>();
         HashMap<String, Double> marketProductionDifference = new HashMap<String, Double>();
+        return new Market(marketAgents, marketInventory, marketJobs, marketPrices, cumulativeMarketConsumption,
+                cumulativeMarketProduction, marketProductionDifference, 1000 * marketAgents.size());
+
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        // Define Market Profile
+
+        MarketInfo fish = new MarketInfo("Fish", 0.35, -0.5, 0.7,
+                10, 1, "Fisherman", 0.4);
+        MarketInfo lumber = new MarketInfo("Lumber", 0.2, -0.5, 0.8,
+                20, 1, "Lumberjack", 0.2);
+        MarketInfo grain = new MarketInfo("Grain", 0.45, -0.5, 0.4,
+                7, 1, "Farmer", 0.4);
+        MarketInfo metal = new MarketInfo("Metal", 0.10, -1.2, 1.5,
+                35, 1, "Blacksmith", 0.05);
+        ArrayList<MarketInfo> currentMarketProfile = new ArrayList<MarketInfo>(List.of(fish, lumber, grain, metal));
+
+        // Define Agents
+        // random number of agents
+        // int numberOfAgents = (int) ((70 * Math.random()) + 5);
+        int numberOfAgents = 100;
+        ArrayList<Agent> marketAgents = new ArrayList<Agent>();
+        marketAgents = makeAgents(currentMarketProfile, numberOfAgents);
 
         // Lastly, define Market
-        //ArrayList<Agent> agents = new ArrayList<Agent>(List.of(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
-        Market market = new Market(agents, inventoryMarket, marketJobs, marketPrices,
-                cumulativeMarketConsumption, cumulativeMarketProduction, marketProductionDifference,
-                1000 * agents.size());
+        Market market = makeMarket(currentMarketProfile, marketAgents);
+
+        // System.out.println(marketAgents);
+        // System.out.println(market);
 
         // run market
         // System.out.println(a1.getInventory());
@@ -850,10 +846,11 @@ public class Main {
                 System.out.println(market.getInventory());
                 printJobs(market);
             }
-
+            /*
             if (counterVar % 100 == 0) {
                 System.out.println(market.getAgents());
             }
+             */
             Thread.sleep(50);
 
             /*
@@ -871,7 +868,7 @@ public class Main {
         System.out.println(market.getPrices());
         System.out.println(market.getInventory());
         printJobs(market);
-        // System.out.println(market.getAgents());
+        System.out.println(market.getAgents());
         // System.out.println(market.getMoney());
         long endTime = System.currentTimeMillis();
         System.out.println("Total time to run 1500 ticks in ms: " + (endTime - startTime));
@@ -1348,4 +1345,65 @@ class Market {
                 "It permits the following job->output combinations: " + this.getJobOutputs() + "\n" +
                 "The market has these prices: " + this.getPrices() + ".");
     }
+}
+
+// given a good in a market, establish the following attributes
+class MarketInfo {
+    private final String good;
+    private final double baseConsumption;
+    private final double priceElasticityDemand;
+    private final double priceElasticitySupply;
+    private final double goodCost;
+    private final double priorityBaseWeight;
+    private final String jobName;
+    private final double jobChance;
+
+    public MarketInfo(String good, double baseConsumption, double priceElasticityDemand, double priceElasticitySupply,
+                      double goodCost, double priorityBaseWeight, String jobName, double jobChance){
+        this.good = good;
+        this.baseConsumption = baseConsumption;
+        this.priceElasticityDemand = priceElasticityDemand;
+        this.priceElasticitySupply = priceElasticitySupply;
+        this.goodCost = goodCost;
+        this.priorityBaseWeight = priorityBaseWeight;
+        this.jobName = jobName;
+        this.jobChance = jobChance;
+    }
+
+    public String getGood(){
+        return good;
+    }
+    public double getBaseConsumption(){
+        return baseConsumption;
+    }
+    public double getPriceElasticityDemand(){
+        return priceElasticityDemand;
+    }
+    public double getPriceElasticitySupply(){
+        return priceElasticitySupply;
+    }
+    public double getGoodCost(){
+        return goodCost;
+    }
+    public double getPriorityBaseWeight(){
+        return priorityBaseWeight;
+    }
+    public String getJobName(){
+        return jobName;
+    }
+    public double getJobChance(){
+        return jobChance;
+    }
+    public String toString(){
+        return ("Good: " + this.getGood() + ", " +
+                "Base Consumption: " + this.getBaseConsumption() + ", " +
+                "Demand Elasticity: " + this.getPriceElasticityDemand() + ", " +
+                "Supply Elasticity: " + this.getPriceElasticitySupply() + ", " +
+                "Good Cost: " + this.getGoodCost() + ", " +
+                "Base Weight: " + this.getPriorityBaseWeight() + ", " +
+                "Job Name: " + this.getJobName() + ", " +
+                "Job Chance: " + this.getJobChance() + ", ");
+    }
+
+
 }
