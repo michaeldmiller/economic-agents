@@ -472,7 +472,15 @@ public class Main {
                 // add demand intercept to sum
                 for (Map.Entry<String, Consumption> c : a.getConsumption().entrySet()) {
                     if (c.getKey().equals(p.getGood())) {
-                        sumDemandIntercept = sumDemandIntercept + (c.getValue().getTickConsumption() * 10);
+                        sumDemandIntercept += (c.getValue().getTickConsumption() * 10);
+
+                        // also add sum of agent's unmet needs
+                        double sumUnmetNeeds = 0;
+                        for (UnmetConsumption u : c.getValue().getUnmetNeeds()){
+                            sumUnmetNeeds += u.getMissingQuantity();
+                        }
+                        sumDemandIntercept += sumUnmetNeeds;
+
                         break;
                     }
                 }
@@ -673,8 +681,16 @@ public class Main {
                             }
                         }
                         // set new agent profession
+                        // get price elasticity of supply
+                        double priceElasticityOfSupply = 0;
+                        for (MarketInfo marketInfo : market.getMarketProfile()){
+                            if (marketInfo.getGood().equals(professionGoodChoice)){
+                                priceElasticityOfSupply = marketInfo.getPriceElasticitySupply();
+                            }
+                        }
+
                         changingCareer.setProfession((new Profession(newAgentJob, 1.0,
-                                1.0, 0.7)));
+                                1.0, priceElasticityOfSupply)));
                         // reset agent satisfaction
                         changingCareer.setSatisfaction(0.0);
 
@@ -802,7 +818,8 @@ public class Main {
         HashMap<String, Double> cumulativeMarketProduction = new HashMap<String, Double>();
         HashMap<String, Double> marketProductionDifference = new HashMap<String, Double>();
         return new Market(marketAgents, marketInventory, marketJobs, marketPrices, cumulativeMarketConsumption,
-                cumulativeMarketProduction, marketProductionDifference, 1000 * marketAgents.size());
+                cumulativeMarketProduction, marketProductionDifference, marketProfile,
+                1000 * marketAgents.size());
 
     }
 
@@ -812,11 +829,11 @@ public class Main {
         MarketInfo fish = new MarketInfo("Fish", 0.35, -0.5, 0.7,
                 10, 1, "Fisherman", 0.4);
         MarketInfo lumber = new MarketInfo("Lumber", 0.2, -0.5, 0.8,
-                20, 1, "Lumberjack", 0.2);
+                15, 1, "Lumberjack", 0.2);
         MarketInfo grain = new MarketInfo("Grain", 0.45, -0.5, 0.4,
                 7, 1, "Farmer", 0.4);
         MarketInfo metal = new MarketInfo("Metal", 0.10, -1.2, 1.5,
-                35, 1, "Blacksmith", 0.05);
+                40, 1, "Blacksmith", 0.05);
         ArrayList<MarketInfo> currentMarketProfile = new ArrayList<MarketInfo>(List.of(fish, lumber, grain, metal));
 
         // Define Agents
@@ -837,16 +854,23 @@ public class Main {
         int counterVar = 0;
         long startTime = System.currentTimeMillis();
 
-        while (counterVar < 500){
+        while (counterVar < 5000){
             runMarket(market, counterVar);
             counterVar++;
 
+            String output = "";
+            for (Price p : market.getPrices()){
+                output += ", " + p.getGood() + " " +  (Math.round(p.getEquilibriumCost() * 100) / 100.0);
+            }
+
+            System.out.println("Tick " + counterVar + output);
+            /*
             if (counterVar % 10 == 0){
                 System.out.println(market.getPrices());
                 System.out.println(market.getInventory());
                 printJobs(market);
             }
-            /*
+
             if (counterVar % 100 == 0) {
                 System.out.println(market.getAgents());
             }
@@ -1277,11 +1301,13 @@ class Market {
     private HashMap<String, Double> marketConsumption;
     private HashMap<String, Double> marketProduction;
     private HashMap<String, Double> productionDifference;
+    private ArrayList<MarketInfo> marketProfile;
     private double money;
 
     public Market(ArrayList<Agent> agents, HashMap<String, Double> inventory, ArrayList<JobOutput> jobOutputs,
                   ArrayList<Price> prices, HashMap<String, Double> marketConsumption,
-                  HashMap<String, Double> marketProduction, HashMap<String, Double> productionDifference, double money){
+                  HashMap<String, Double> marketProduction, HashMap<String, Double> productionDifference,
+                  ArrayList<MarketInfo> marketProfile, double money){
         this.agents = agents;
         this.inventory = inventory;
         this.jobOutputs = jobOutputs;
@@ -1289,6 +1315,7 @@ class Market {
         this.marketConsumption = marketConsumption;
         this.marketProduction = marketProduction;
         this.productionDifference = productionDifference;
+        this.marketProfile = marketProfile;
         this.money = money;
     }
     public ArrayList<Agent> getAgents(){
@@ -1311,6 +1338,9 @@ class Market {
     }
     public HashMap<String, Double> getProductionDifference() {
         return productionDifference;
+    }
+    public ArrayList<MarketInfo> getMarketProfile(){
+        return marketProfile;
     }
     public double getMoney(){
         return money;
@@ -1335,6 +1365,9 @@ class Market {
     }
     public void setProductionDifference(HashMap<String, Double> newProductionDifference){
         productionDifference = newProductionDifference;
+    }
+    public void setMarketProfile(ArrayList<MarketInfo> newMarketProfile){
+        marketProfile = newMarketProfile;
     }
     public void setMoney(double newMoney){
         money = newMoney;
