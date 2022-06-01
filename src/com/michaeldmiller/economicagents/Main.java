@@ -1,5 +1,6 @@
+package com.michaeldmiller.economicagents;
+
 import java.util.*;
-import java.lang.Thread;
 
 public class Main {
     /*
@@ -18,7 +19,7 @@ public class Main {
     an economic environment which is more approachable.
     While this system attempts to abstract relevant economic features as little as possible, for simplicity
     and sanity's sake there are a number of abstractions/cheats built into the system: behaviors and attributes
-    determined outside the system: namely the consumption profile of an Agent and the BaseCost of each Good.
+    determined outside the system.
      */
 
     // randomizer functions, designed in a previous project:
@@ -839,11 +840,11 @@ public class Main {
         // Define Agents
         // random number of agents
         // int numberOfAgents = (int) ((70 * Math.random()) + 5);
-        int numberOfAgents = 100;
+        int numberOfAgents = 5000;
         ArrayList<Agent> marketAgents = new ArrayList<Agent>();
         marketAgents = makeAgents(currentMarketProfile, numberOfAgents);
 
-        // Lastly, define Market
+        // Lastly, define com.michaeldmiller.economicagents.Market
         Market market = makeMarket(currentMarketProfile, marketAgents);
 
         // System.out.println(marketAgents);
@@ -858,12 +859,14 @@ public class Main {
             runMarket(market, counterVar);
             counterVar++;
 
-            String output = "";
-            for (Price p : market.getPrices()){
-                output += ", " + p.getGood() + " " +  (Math.round(p.getEquilibriumCost() * 100) / 100.0);
+            if (counterVar % 50 == 0){
+                String output = "";
+                for (Price p : market.getPrices()){
+                    output += ", " + p.getGood() + " " +  (Math.round(p.getEquilibriumCost() * 100) / 100.0);
+                }
+                System.out.println("Tick " + counterVar + output);
             }
 
-            System.out.println("Tick " + counterVar + output);
             /*
             if (counterVar % 10 == 0){
                 System.out.println(market.getPrices());
@@ -875,7 +878,7 @@ public class Main {
                 System.out.println(market.getAgents());
             }
              */
-            Thread.sleep(50);
+            // Thread.sleep(50);
 
             /*
             System.out.println(market.getPrices());
@@ -892,551 +895,15 @@ public class Main {
         System.out.println(market.getPrices());
         System.out.println(market.getInventory());
         printJobs(market);
-        System.out.println(market.getAgents());
+        // System.out.println(market.getAgents());
         // System.out.println(market.getMoney());
         long endTime = System.currentTimeMillis();
         System.out.println("Total time to run 1500 ticks in ms: " + (endTime - startTime));
 
     }
 }
-
-class ChoiceWeight {
-    String choice;
-    int weight;
-
-    public ChoiceWeight(String choice, int weight){
-        this.choice = choice;
-        this.weight = weight;
-    }
-
-    public String getChoice(){
-        return choice;
-    }
-
-    public int getWeight(){
-        return weight;
-    }
-
-    public String toString() {
-        return (this.getChoice() + "-" +
-                this.getWeight());
-    }
-}
-
-// First, define the classes needed for an Agent:
 // An Inventory is a HashMap of String and Double
 
-// A 'Priorities' is an ArrayList of Priority
-class Priority{
-    private String good;
-    private double baseWeight;
-    private double relativeNeed;
-    private double modifier;
-    private double priceElasticity;
-    private double originalPriceElasticity;
-    private double weight;
-    public Priority (String good, double baseWeight, double relativeNeed,
-                     double modifier, double priceElasticity, double originalPriceElasticity,
-                     double weight){
-        this.good = good;
-        this.baseWeight = baseWeight;
-        this.relativeNeed = relativeNeed;
-        this.modifier = modifier;
-        this.priceElasticity = priceElasticity;
-        this.originalPriceElasticity = originalPriceElasticity;
-        this.weight = weight;
-    }
-    public String getGood(){
-        return good;
-    }
-    public double getBaseWeight(){
-        return baseWeight;
-    }
-    public double getRelativeNeed(){
-        return relativeNeed;
-    }
-    public double getModifier(){
-        return modifier;
-    }
-    public double getPriceElasticity(){
-        return priceElasticity;
-    }
-    public double getOriginalPriceElasticity(){
-        return originalPriceElasticity;
-    }
-    public double getWeight(){
-        return weight;
-    }
-    public void setGood(String newGood){
-        good = newGood;
-    }
-    public void setBaseWeight(double newBaseWeight){
-        baseWeight = newBaseWeight;
-    }
-    public void setRelativeNeed(double newRelativeNeed){
-        relativeNeed = newRelativeNeed;
-    }
-    public void setModifier(double newModifier){
-        modifier = newModifier;
-    }
-    public void setPriceElasticity(double newPriceElasticity){
-        priceElasticity = newPriceElasticity;
-    }
-    public void setOriginalPriceElasticity(double newOriginalPriceElasticity){
-        originalPriceElasticity = newOriginalPriceElasticity;
-    }
-    public void setWeight(double newWeight){
-        weight = newWeight;
-    }
-    public String toString(){
-        return ("\n" + this.getGood() + ": " +
-                "base weight: " + this.getBaseWeight() + ", " +
-                "relative need: " + this.getRelativeNeed() + ", " +
-                "modifier: " + this.getModifier() + ", " +
-                "price elasticity: " + this.getPriceElasticity() + ", " +
-                "original price elasticity: " + this.getOriginalPriceElasticity() + ", " +
-                "final weight: " + this.getWeight() + ".");
-    }
-}
-
-// A 'Consumptions' is a HashMap of Consumption
-class Consumption {
-    private double tickConsumption;
-    private ArrayList<UnmetConsumption> unmetNeeds;
-    /*
-    private double status;
-    // slope * ln(status - offset) + intercept
-    private double slope;
-    private double offset;
-    private double intercept;
-    */
-
-    public Consumption(double tickConsumption, ArrayList<UnmetConsumption> unmetNeeds
-                        //, double status, double slope, double offset, double intercept
-                                                                    ){
-        this.tickConsumption = tickConsumption;
-        this.unmetNeeds = unmetNeeds;
-        /*
-        this.status = status;
-        this.slope = slope;
-        this.offset = offset;
-        this.intercept = intercept;
-        */
-    }
-
-    public double getTickConsumption(){
-        return tickConsumption;
-    }
-    public ArrayList<UnmetConsumption> getUnmetNeeds(){
-        return unmetNeeds;
-    }
-    /*
-    public double getStatus(){
-        return status;
-    }
-    public double getSlope(){
-        return slope;
-    }
-    public double getOffset(){
-        return offset;
-    }
-    public double getIntercept(){
-        return intercept;
-    }
-    */
-    public void setTickConsumption(double newTickConsumption){
-        tickConsumption = newTickConsumption;
-    }
-    public void setUnmetNeeds(ArrayList<UnmetConsumption> newUnmetNeeds){
-        unmetNeeds = newUnmetNeeds;
-    }
-    /*
-    public void setStatus(double newStatus){
-        status = newStatus;
-    }
-    public void setSlope(double newSlope){
-        slope = newSlope;
-    }
-    public void setOffset(double newOffset){
-        offset = newOffset;
-    }
-    public void setIntercept(double newIntercept){
-        intercept = newIntercept;
-    }
-    */
-    public String toString(){
-        return ("Tick Consumption: " + this.getTickConsumption() + ", " +
-                "Unmet Needs: " + this.getUnmetNeeds()
-                /*
-                + ", " + "Socioeconomic Status: " + this.getStatus() + ", " +
-                "Demand function slope: " + this.getSlope() + ", " +
-                "offset: " + this.getOffset() + ", " +
-                "intercept: " + this.getIntercept()
-                */
-                );
-    }
+// Class definitions moved to separate files
 
 
-}
-
-class UnmetConsumption {
-    private int ticksPassed;
-    private double missingQuantity;
-
-    public UnmetConsumption(int ticksPassed, double missingQuantity){
-        this.ticksPassed = ticksPassed;
-        this.missingQuantity = missingQuantity;
-    }
-
-    public int getTicksPassed(){
-        return ticksPassed;
-    }
-    public double getMissingQuantity(){
-        return missingQuantity;
-    }
-    public void setTicksPassed(int newTicksPassed){
-        ticksPassed = newTicksPassed;
-    }
-    public void setMissingQuantity(double newMissingQuantity){
-        missingQuantity = newMissingQuantity;
-    }
-    public String toString(){
-        return(this.getTicksPassed() + ", " + this.getMissingQuantity());
-    }
-}
-
-class Profession {
-    private String job;
-    private double skillLevel;
-    private double shortRunProduction;
-    private double priceElasticityOfSupply;
-
-    // if deficiency in short run production vs market quantity, permit switch
-    // problem: market quantity higher than it is possible for any combination of agents to produce
-    // solution: derive production and demand curves from consumption and production /capacity/ of agents
-
-    public Profession (String job, double skillLevel, double shortRunProduction, double priceElasticityOfSupply){
-        this.job = job;
-        this.skillLevel = skillLevel;
-        this.shortRunProduction = shortRunProduction;
-        this.priceElasticityOfSupply = priceElasticityOfSupply;
-    }
-    public String getJob(){
-        return job;
-    }
-    public double getSkillLevel(){
-        return skillLevel;
-    }
-    public double getShortRunProduction(){
-        return shortRunProduction;
-    }
-    public double getPriceElasticityOfSupply(){
-        return priceElasticityOfSupply;
-    }
-
-    public void setJob(String newJob){
-        job = newJob;
-    }
-    public void setSkillLevel(double newSkillLevel){
-        skillLevel = newSkillLevel;
-    }
-    public void setPriceElasticityOfSupply(double newPriceElasticity){
-        priceElasticityOfSupply = newPriceElasticity;
-    }
-    public void setShortRunProduction(double newProduction){
-        shortRunProduction = newProduction;
-    }
-
-    public String toString(){
-        return(this.getJob() + ", skill level: " +
-                this.getSkillLevel());
-    }
-}
-
-class Agent {
-    private String id;
-    private HashMap<String, Double> inventory;
-    private ArrayList<Priority> priorities;
-    private HashMap<String, Consumption> consumption;
-    private Profession profession;
-    private double money;
-    private double satisfaction;
-
-    public Agent (String id, HashMap<String, Double> inventory, ArrayList<Priority> priorities,
-                  HashMap<String, Consumption> consumption, Profession profession, double money,
-                  double satisfaction){
-        this.id = id;
-        this.inventory = inventory;
-        this.priorities = priorities;
-        this.consumption = consumption;
-        this.profession = profession;
-        this.money = money;
-        this.satisfaction = satisfaction;
-    }
-    public String getId(){
-        return id;
-    }
-    public HashMap<String, Double> getInventory(){
-        return inventory;
-    }
-    public ArrayList<Priority> getPriorities(){
-        return priorities;
-    }
-    public HashMap<String, Consumption> getConsumption(){
-        return consumption;
-    }
-    public Profession getProfession(){
-        return profession;
-    }
-    public double getMoney(){
-        return money;
-    }
-    public double getSatisfaction(){
-        return satisfaction;
-    }
-    public void setId(String newID){
-        id = newID;
-    }
-    public void setInventory(HashMap<String, Double> newInventory){
-        inventory = newInventory;
-    }
-    public void setPriorities(ArrayList<Priority> newPriorities){
-        priorities = newPriorities;
-    }
-    public void setConsumption(HashMap<String, Consumption> newConsumption){
-        consumption = newConsumption;
-    }
-    public void setProfession(Profession newProfession){
-        profession = newProfession;
-    }
-    public void setMoney(double newMoney){
-        money = newMoney;
-    }
-    public void setSatisfaction(double newSatisfaction){
-        satisfaction = newSatisfaction;
-    }
-    public String toString(){
-        return ("\n\n" + "ID: " + this.getId() + ",\n" +
-                "Inventory: " + this.getInventory() + ",\n" +
-                "Priorities: " + this.getPriorities() + ",\n" +
-                "Consumption: " + this.getConsumption() + ",\n" +
-                "Profession: " + this.getProfession() + ",\n" +
-                "Money: " + this.getMoney() + ",\n" +
-                "Satisfaction: " + this.getSatisfaction() + ".");
-    }
-}
-// Next up is defining the Market, for the Agents to interact.
-class JobOutput{
-    private String job;
-    private String good;
-    public JobOutput (String job, String good){
-        this.job = job;
-        this.good = good;
-    }
-    public String getJob(){
-        return job;
-    }
-    public String getGood(){
-        return good;
-    }
-    public void setJob(String newJob){
-        job = newJob;
-    }
-    public void setGood(String newGood){
-        good = newGood;
-    }
-    public String toString(){
-        return ("\n" + this.getJob() + " -> " + this.getGood());
-    }
-}
-
-class Price{
-    private String good;
-    private double cost;
-    private double equilibriumCost;
-    private final double originalCost;
-
-    public Price (String good, double cost, double equilibriumCost, double originalCost){
-        this.good = good;
-        this.cost = cost;
-        this.equilibriumCost= equilibriumCost;
-        this.originalCost = originalCost;
-    }
-
-    public String getGood(){
-        return good;
-    }
-    public double getCost(){
-        return cost;
-    }
-    public double getEquilibriumCost(){
-        return equilibriumCost;
-    }
-    public double getOriginalCost(){
-        return originalCost;
-    }
-    public void setGood(String newGood){
-        good = newGood;
-    }
-    public void setCost(double newCost){
-        cost = newCost;
-    }
-    public void setEquilibriumCost(double newEquilibriumCost){
-        equilibriumCost = newEquilibriumCost;
-    }
-    public String toString(){
-        return ("\n" + this.getGood() + ", " +
-                "Cost: " + this.getCost() + ", " +
-                "Equilibrium Cost: " + this.getEquilibriumCost() + ", " +
-                "Original Cost: " + this.getOriginalCost());
-    }
-}
-
-
-class Market {
-    private ArrayList<Agent> agents;
-    private HashMap<String, Double> inventory;
-    private ArrayList<JobOutput> jobOutputs;
-    private ArrayList<Price> prices;
-    private HashMap<String, Double> marketConsumption;
-    private HashMap<String, Double> marketProduction;
-    private HashMap<String, Double> productionDifference;
-    private ArrayList<MarketInfo> marketProfile;
-    private double money;
-
-    public Market(ArrayList<Agent> agents, HashMap<String, Double> inventory, ArrayList<JobOutput> jobOutputs,
-                  ArrayList<Price> prices, HashMap<String, Double> marketConsumption,
-                  HashMap<String, Double> marketProduction, HashMap<String, Double> productionDifference,
-                  ArrayList<MarketInfo> marketProfile, double money){
-        this.agents = agents;
-        this.inventory = inventory;
-        this.jobOutputs = jobOutputs;
-        this.prices = prices;
-        this.marketConsumption = marketConsumption;
-        this.marketProduction = marketProduction;
-        this.productionDifference = productionDifference;
-        this.marketProfile = marketProfile;
-        this.money = money;
-    }
-    public ArrayList<Agent> getAgents(){
-        return agents;
-    }
-    public HashMap<String, Double> getInventory(){
-        return inventory;
-    }
-    public ArrayList<JobOutput> getJobOutputs(){
-        return jobOutputs;
-    }
-    public ArrayList<Price> getPrices(){
-        return prices;
-    }
-    public HashMap<String, Double> getMarketConsumption() {
-        return marketConsumption;
-    }
-    public HashMap<String, Double> getMarketProduction() {
-        return marketProduction;
-    }
-    public HashMap<String, Double> getProductionDifference() {
-        return productionDifference;
-    }
-    public ArrayList<MarketInfo> getMarketProfile(){
-        return marketProfile;
-    }
-    public double getMoney(){
-        return money;
-    }
-    public void setAgents(ArrayList<Agent> newAgents){
-        agents = newAgents;
-    }
-    public void setInventory(HashMap<String, Double> newInventory){
-        inventory = newInventory;
-    }
-    public void setJobOutputs(ArrayList<JobOutput> newJobOutputs){
-        jobOutputs = newJobOutputs;
-    }
-    public void setPrices(ArrayList<Price> newPrices){
-        prices = newPrices;
-    }
-    public void setMarketConsumption(HashMap<String, Double> newMarketConsumption){
-        marketConsumption = newMarketConsumption;
-    }
-    public void setMarketProduction(HashMap<String, Double> newMarketProduction){
-        marketProduction = newMarketProduction;
-    }
-    public void setProductionDifference(HashMap<String, Double> newProductionDifference){
-        productionDifference = newProductionDifference;
-    }
-    public void setMarketProfile(ArrayList<MarketInfo> newMarketProfile){
-        marketProfile = newMarketProfile;
-    }
-    public void setMoney(double newMoney){
-        money = newMoney;
-    }
-    public String toString(){
-        return ("This market has the following agents: \n" + this.getAgents() + "\n" +
-                "The market inventory is: " + this.getInventory() + "\n" +
-                "It permits the following job->output combinations: " + this.getJobOutputs() + "\n" +
-                "The market has these prices: " + this.getPrices() + ".");
-    }
-}
-
-// given a good in a market, establish the following attributes
-class MarketInfo {
-    private final String good;
-    private final double baseConsumption;
-    private final double priceElasticityDemand;
-    private final double priceElasticitySupply;
-    private final double goodCost;
-    private final double priorityBaseWeight;
-    private final String jobName;
-    private final double jobChance;
-
-    public MarketInfo(String good, double baseConsumption, double priceElasticityDemand, double priceElasticitySupply,
-                      double goodCost, double priorityBaseWeight, String jobName, double jobChance){
-        this.good = good;
-        this.baseConsumption = baseConsumption;
-        this.priceElasticityDemand = priceElasticityDemand;
-        this.priceElasticitySupply = priceElasticitySupply;
-        this.goodCost = goodCost;
-        this.priorityBaseWeight = priorityBaseWeight;
-        this.jobName = jobName;
-        this.jobChance = jobChance;
-    }
-
-    public String getGood(){
-        return good;
-    }
-    public double getBaseConsumption(){
-        return baseConsumption;
-    }
-    public double getPriceElasticityDemand(){
-        return priceElasticityDemand;
-    }
-    public double getPriceElasticitySupply(){
-        return priceElasticitySupply;
-    }
-    public double getGoodCost(){
-        return goodCost;
-    }
-    public double getPriorityBaseWeight(){
-        return priorityBaseWeight;
-    }
-    public String getJobName(){
-        return jobName;
-    }
-    public double getJobChance(){
-        return jobChance;
-    }
-    public String toString(){
-        return ("Good: " + this.getGood() + ", " +
-                "Base Consumption: " + this.getBaseConsumption() + ", " +
-                "Demand Elasticity: " + this.getPriceElasticityDemand() + ", " +
-                "Supply Elasticity: " + this.getPriceElasticitySupply() + ", " +
-                "Good Cost: " + this.getGoodCost() + ", " +
-                "Base Weight: " + this.getPriorityBaseWeight() + ", " +
-                "Job Name: " + this.getJobName() + ", " +
-                "Job Chance: " + this.getJobChance() + ", ");
-    }
-
-
-}
