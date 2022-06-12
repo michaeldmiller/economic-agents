@@ -1,7 +1,7 @@
 package com.michaeldmiller.economicagents;
 
 // given a good in a market, establish the following attributes
-class MarketInfo {
+public class MarketInfo {
     private final String good;
     private final double baseConsumption;
     private final double priceElasticityDemand;

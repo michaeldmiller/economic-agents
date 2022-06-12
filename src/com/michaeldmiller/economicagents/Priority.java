@@ -1,7 +1,7 @@
 package com.michaeldmiller.economicagents;
 
 // A 'Priorities' is an ArrayList of com.michaeldmiller.economicagents.Priority
-class Priority {
+public class Priority {
     private String good;
     private double baseWeight;
     private double relativeNeed;

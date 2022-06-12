@@ -1,6 +1,6 @@
 package com.michaeldmiller.economicagents;
 
-class Profession {
+public class Profession {
     private String job;
     private double skillLevel;
     private double shortRunProduction;

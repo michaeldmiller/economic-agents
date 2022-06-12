@@ -1,6 +1,6 @@
 package com.michaeldmiller.economicagents;
 
-class ChoiceWeight {
+public class ChoiceWeight {
     String choice;
     int weight;
 

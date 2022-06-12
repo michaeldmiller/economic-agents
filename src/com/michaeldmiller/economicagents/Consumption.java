@@ -3,7 +3,7 @@ package com.michaeldmiller.economicagents;
 import java.util.ArrayList;
 
 // A 'Consumptions' is a HashMap of com.michaeldmiller.economicagents.Consumption
-class Consumption {
+public class Consumption {
     private double tickConsumption;
     private ArrayList<UnmetConsumption> unmetNeeds;
     /*

@@ -3,7 +3,7 @@ package com.michaeldmiller.economicagents;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-class Agent {
+public class Agent {
     private String id;
     private HashMap<String, Double> inventory;
     private ArrayList<Priority> priorities;

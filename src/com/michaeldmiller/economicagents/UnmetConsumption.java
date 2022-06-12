@@ -1,6 +1,6 @@
 package com.michaeldmiller.economicagents;
 
-class UnmetConsumption {
+public class UnmetConsumption {
     private int ticksPassed;
     private double missingQuantity;
 

@@ -3,7 +3,7 @@ package com.michaeldmiller.economicagents;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-class Market {
+public class Market {
     private ArrayList<Agent> agents;
     private HashMap<String, Double> inventory;
     private ArrayList<JobOutput> jobOutputs;

@@ -2,7 +2,7 @@ package com.michaeldmiller.economicagents;
 
 import java.util.*;
 
-public class Main {
+public class MarketMain {
     /*
     I have always been enamored by the ability of computation to simulate the world around us.
     The goal of this project is to create a virtual marketplace, where economic rationals guide the
@@ -23,7 +23,7 @@ public class Main {
      */
 
     // randomizer functions, designed in a previous project:
-    static String randomPick(ArrayList<String> lst){
+    public static String randomPick(ArrayList<String> lst){
         // given a list of strings, return a random choice from the list
         // does not modify the list or prevent duplicate picks
         int listLength = lst.size();
@@ -31,7 +31,7 @@ public class Main {
         return lst.get(choiceNumber);
     }
 
-    static String randomWeightedPick(ArrayList<String> choices, ArrayList<Integer> weights){
+    public static String randomWeightedPick(ArrayList<String> choices, ArrayList<Integer> weights){
         // ArrayList<String>, ArrayList<Integer> -> String
         // given a list of choices, and a list of integer weights of the same list length
         // whose values correspond to the weights of the choices, make a weighted randomized
@@ -73,7 +73,7 @@ public class Main {
     // Given an Agent and a Market, have the agent produce a good according to its Job, deliver
     // the good to the market, and be compensated accordingly.
     // Breaks if the agent is not initialized with a job that is in the market's job output list!
-    static void agentProduce (Agent agent, Market market){
+    public static void agentProduce (Agent agent, Market market){
         // first determine what goods are going to be produced
         String goodType = "";
         for (JobOutput j : market.getJobOutputs()) {
@@ -97,7 +97,8 @@ public class Main {
 
             // add variance to production factor (normal distribution, standard deviation of 7%
             Random random = new Random();
-            double variance = random.nextGaussian(0,0.07);
+            // double variance = random.nextGaussian(0.0,0.07);
+            double variance = 1 + (0.07 * random.nextGaussian());
             // get agent base production (can change later to account for good types producing different quantities)
             double baseProduction = agent.getProfession().getSkillLevel();
             // combine factors
@@ -136,7 +137,7 @@ public class Main {
     }
 
     // apply Agent production to the Market
-    static void marketProduce (Market m){
+    public static void marketProduce (Market m){
         for (Agent a : m.getAgents()){
             agentProduce(a, m);
         }
@@ -148,7 +149,7 @@ public class Main {
     // an Agent running out of a good significantly increases its relative need for it, having that good again resets
     // the relative need
 
-    static void agentConsume (Agent a, Market m){
+    public static void agentConsume (Agent a, Market m){
         for (Map.Entry<String, Consumption> agentConsumption: a.getConsumption().entrySet()){
             // handle unmet needs, if they exist
             for (int i = 0; i < a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().size(); i++){
@@ -207,7 +208,7 @@ public class Main {
         }
     }
     // apply Agent consumption to the Market
-    static void marketConsume (Market m){
+    public static void marketConsume (Market m){
         for (Agent a : m.getAgents()){
             agentConsume(a, m);
         }
@@ -217,7 +218,7 @@ public class Main {
     // splitting into two functions: one which updates agent priorities,
     // second which makes actual purchasing decision
 
-    static void agentPriorities (Agent a, Market m){
+    public static void agentPriorities (Agent a, Market m){
         // calculate current relative demand based on elasticity
         for (Priority p : a.getPriorities()){
             // change demand elasticity based on sum of remembered unmet consumption
@@ -285,13 +286,13 @@ public class Main {
             // if agent tries to buy from market but can't, price goes up, relative to number of agents in the market
         }
     }
-    static void marketPriorities (Market m){
+    public static void marketPriorities (Market m){
         for (Agent a : m.getAgents()){
             agentPriorities(a, m);
         }
     }
 
-    static void agentPurchase (Agent a, Market m){
+    public static void agentPurchase (Agent a, Market m){
         boolean notPurchased = true;
         double holdMoneySatisfaction = 0.5;
 
@@ -424,14 +425,14 @@ public class Main {
             }
         }
 
-    static void marketPurchase (Market m){
+    public static void marketPurchase (Market m){
         for (Agent a : m.getAgents()){
             agentPurchase(a, m);
         }
     }
 
 
-    static void marketPrices (Market market){
+    public static void marketPrices (Market market){
         // given a Market, calculate the Supply and Demand equilibrium for each good, then
         // use this to set the prices of each good
 
@@ -525,7 +526,7 @@ public class Main {
         }
     }
 
-    static void marketProductionSatisfaction (Market market){
+    public static void marketProductionSatisfaction (Market market){
         // given a market, calculate cumulative consumption and production of each good, use this to determine whether
         // a good is over or under produced, then affect agent satisfaction accordingly.
 
@@ -644,7 +645,7 @@ public class Main {
 
     }
 
-    static void marketSupply (Market market){
+    public static void marketSupply (Market market){
         for (Agent changingCareer : market.getAgents()){
             // * square root of absolute value of satisfaction
             // check if the agent is unhappy about their production;
@@ -703,7 +704,7 @@ public class Main {
     }
 
     // print jobs
-    static void printJobs (Market market){
+    public static void printJobs (Market market){
         HashMap<String, Integer> jobsTotal = new HashMap<String, Integer>();
         for (Agent a : market.getAgents()){
             if (!jobsTotal.containsKey(a.getProfession().getJob())){
@@ -717,7 +718,7 @@ public class Main {
         System.out.println(jobsTotal);
     }
 
-    static void printMoney (Market market){
+    public static void printMoney (Market market){
         double totalMoney = market.getMoney();
         for (Agent a : market.getAgents()){
             totalMoney = totalMoney + a.getMoney();
@@ -726,7 +727,7 @@ public class Main {
     }
 
     // master controller function
-    static void runMarket (Market market, int counter) throws InterruptedException {
+    public static void runMarket (Market market, int counter) throws InterruptedException {
         marketProductionSatisfaction(market);
         marketProduce(market);
         marketConsume(market);
@@ -749,7 +750,7 @@ public class Main {
     }
 
 
-    static ArrayList<Agent> makeAgents(ArrayList<MarketInfo> marketProfile, int numberOfAgents){
+    public static ArrayList<Agent> makeAgents(ArrayList<MarketInfo> marketProfile, int numberOfAgents){
         // given information about the characteristics of a market and a number of agents, produce a list of agents
         // for that market
         ArrayList<Agent> agents = new ArrayList<Agent>();
@@ -767,13 +768,15 @@ public class Main {
             // add good consumptions, inventory, and priorities
             for (MarketInfo marketInfo : marketProfile){
                 // put base consumption with variance (standard deviation 7%)
-                double consumptionVariance = 1 + random.nextGaussian(0,0.07);
+                // double consumptionVariance = 1 + random.nextGaussian(0.0,0.07);
+                double consumptionVariance = 1 + (0.07 * random.nextGaussian());
                 agentConsumption.put(marketInfo.getGood(), new Consumption(marketInfo.getBaseConsumption()
-                        * consumptionVariance, new ArrayList<>()));
+                        * consumptionVariance, new ArrayList<UnmetConsumption>()));
                 // put 5 * base good consumption of good in agent's inventory
                 agentInventory.put(marketInfo.getGood(), 5 * marketInfo.getBaseConsumption());
                 // add good priority to agent with variance (standard deviation 2.5%)
-                double demandElasticityVariance = 1 + random.nextGaussian(0,0.025);
+                // double demandElasticityVariance = 1 + random.nextGaussian(0.0,0.025);
+                double demandElasticityVariance = 1 + (0.025 * random.nextGaussian());
                 double demandElasticity = marketInfo.getPriceElasticityDemand() * demandElasticityVariance;
                 agentPriorities.add(new Priority(marketInfo.getGood(), marketInfo.getPriorityBaseWeight(),
                         1, 1, demandElasticity, demandElasticity,  1));
@@ -787,7 +790,8 @@ public class Main {
             for (MarketInfo marketInfoRound2 : marketProfile) {
                 if (marketInfoRound2.getGood().equals(professionPick)){
                     agentProfession.setJob(marketInfoRound2.getJobName());
-                    double supplyElasticityVariance = 1 + random.nextGaussian(0,0.025);
+                    //double supplyElasticityVariance = 1 + random.nextGaussian(0.0,0.025);
+                    double supplyElasticityVariance = 1 + (0.025 * random.nextGaussian());
                     agentProfession.setPriceElasticityOfSupply(marketInfoRound2.getPriceElasticitySupply()
                             * supplyElasticityVariance);
                     startingMoney = marketInfoRound2.getGoodCost();
@@ -801,7 +805,7 @@ public class Main {
         return agents;
     }
 
-    static Market makeMarket(ArrayList<MarketInfo> marketProfile, ArrayList<Agent> marketAgents){
+    public static Market makeMarket(ArrayList<MarketInfo> marketProfile, ArrayList<Agent> marketAgents){
         HashMap<String, Double> marketInventory = new HashMap<String, Double>();
         ArrayList<JobOutput> marketJobs = new ArrayList<JobOutput>();
         ArrayList<Price> marketPrices = new ArrayList<Price>();
@@ -827,25 +831,7 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         // Define Market Profile
 
-        MarketInfo fish = new MarketInfo("Fish", 0.35, -0.5, 0.7,
-                10, 1, "Fisherman", 0.4);
-        MarketInfo lumber = new MarketInfo("Lumber", 0.2, -0.5, 0.8,
-                15, 1, "Lumberjack", 0.2);
-        MarketInfo grain = new MarketInfo("Grain", 0.45, -0.5, 0.4,
-                7, 1, "Farmer", 0.4);
-        MarketInfo metal = new MarketInfo("Metal", 0.10, -1.2, 1.5,
-                40, 1, "Blacksmith", 0.05);
-        ArrayList<MarketInfo> currentMarketProfile = new ArrayList<MarketInfo>(List.of(fish, lumber, grain, metal));
 
-        // Define Agents
-        // random number of agents
-        // int numberOfAgents = (int) ((70 * Math.random()) + 5);
-        int numberOfAgents = 5000;
-        ArrayList<Agent> marketAgents = new ArrayList<Agent>();
-        marketAgents = makeAgents(currentMarketProfile, numberOfAgents);
-
-        // Lastly, define com.michaeldmiller.economicagents.Market
-        Market market = makeMarket(currentMarketProfile, marketAgents);
 
         // System.out.println(marketAgents);
         // System.out.println(market);
@@ -855,55 +841,8 @@ public class Main {
         int counterVar = 0;
         long startTime = System.currentTimeMillis();
 
-        while (counterVar < 5000){
-            runMarket(market, counterVar);
-            counterVar++;
 
-            if (counterVar % 50 == 0){
-                String output = "";
-                for (Price p : market.getPrices()){
-                    output += ", " + p.getGood() + " " +  (Math.round(p.getEquilibriumCost() * 100) / 100.0);
-                }
-                System.out.println("Tick " + counterVar + output);
-            }
-
-            /*
-            if (counterVar % 10 == 0){
-                System.out.println(market.getPrices());
-                System.out.println(market.getInventory());
-                printJobs(market);
-            }
-
-            if (counterVar % 100 == 0) {
-                System.out.println(market.getAgents());
-            }
-             */
-            // Thread.sleep(50);
-
-            /*
-            System.out.println(market.getPrices());
-            System.out.println(market.getInventory());
-            System.out.println("Production: " + market.getMarketProduction());
-            System.out.println("Consumption: " + market.getMarketConsumption());
-            System.out.println("Difference: " + market.getProductionDifference());
-            // System.out.println(market.getAgents());
-            printJobs(market);
-            Thread.sleep(50);
-
-             */
-        }
-        System.out.println(market.getPrices());
-        System.out.println(market.getInventory());
-        printJobs(market);
-        // System.out.println(market.getAgents());
-        // System.out.println(market.getMoney());
-        long endTime = System.currentTimeMillis();
-        System.out.println("Total time to run 1500 ticks in ms: " + (endTime - startTime));
 
     }
 }
-// An Inventory is a HashMap of String and Double
-
-// Class definitions moved to separate files
-
 
