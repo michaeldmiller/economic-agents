@@ -4,6 +4,7 @@ package com.michaeldmiller.economicagents;
 public class MarketInfo {
     private final String good;
     private final double baseConsumption;
+    private final double baseProduction;
     private final double priceElasticityDemand;
     private final double priceElasticitySupply;
     private final double goodCost;
@@ -11,10 +12,12 @@ public class MarketInfo {
     private final String jobName;
     private final double jobChance;
 
-    public MarketInfo(String good, double baseConsumption, double priceElasticityDemand, double priceElasticitySupply,
-                      double goodCost, double priorityBaseWeight, String jobName, double jobChance) {
+    public MarketInfo(String good, double baseConsumption, double baseProduction, double priceElasticityDemand,
+                      double priceElasticitySupply, double goodCost, double priorityBaseWeight,
+                      String jobName, double jobChance) {
         this.good = good;
         this.baseConsumption = baseConsumption;
+        this.baseProduction = baseProduction;
         this.priceElasticityDemand = priceElasticityDemand;
         this.priceElasticitySupply = priceElasticitySupply;
         this.goodCost = goodCost;
@@ -29,6 +32,9 @@ public class MarketInfo {
 
     public double getBaseConsumption() {
         return baseConsumption;
+    }
+    public double getBaseProduction(){
+        return baseProduction;
     }
 
     public double getPriceElasticityDemand() {
@@ -57,7 +63,8 @@ public class MarketInfo {
 
     public String toString() {
         return ("Good: " + this.getGood() + ", " +
-                "Base com.michaeldmiller.economicagents.Consumption: " + this.getBaseConsumption() + ", " +
+                "Base Consumption: " + this.getBaseConsumption() + ", " +
+                "Base Production: " + this.getBaseConsumption() + ", " +
                 "Demand Elasticity: " + this.getPriceElasticityDemand() + ", " +
                 "Supply Elasticity: " + this.getPriceElasticitySupply() + ", " +
                 "Good Cost: " + this.getGoodCost() + ", " +

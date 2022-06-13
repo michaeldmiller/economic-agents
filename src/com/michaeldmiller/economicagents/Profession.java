@@ -3,6 +3,7 @@ package com.michaeldmiller.economicagents;
 public class Profession {
     private String job;
     private double skillLevel;
+    private double baseProduction;
     private double shortRunProduction;
     private double priceElasticityOfSupply;
 
@@ -10,9 +11,11 @@ public class Profession {
     // problem: market quantity higher than it is possible for any combination of agents to produce
     // solution: derive production and demand curves from consumption and production /capacity/ of agents
 
-    public Profession(String job, double skillLevel, double shortRunProduction, double priceElasticityOfSupply) {
+    public Profession(String job, double skillLevel, double baseProduction, double shortRunProduction,
+                      double priceElasticityOfSupply) {
         this.job = job;
         this.skillLevel = skillLevel;
+        this.baseProduction = baseProduction;
         this.shortRunProduction = shortRunProduction;
         this.priceElasticityOfSupply = priceElasticityOfSupply;
     }
@@ -23,6 +26,9 @@ public class Profession {
 
     public double getSkillLevel() {
         return skillLevel;
+    }
+    public double getBaseProduction(){
+        return baseProduction;
     }
 
     public double getShortRunProduction() {
@@ -39,6 +45,9 @@ public class Profession {
 
     public void setSkillLevel(double newSkillLevel) {
         skillLevel = newSkillLevel;
+    }
+    public void setBaseProduction(double newBaseProduction){
+        baseProduction= newBaseProduction;
     }
 
     public void setPriceElasticityOfSupply(double newPriceElasticity) {
