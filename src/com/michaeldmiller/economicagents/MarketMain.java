@@ -334,6 +334,7 @@ public class MarketMain {
                     break;
                 }
             }
+
             // See if Agent can't afford to buy its chosen good
             if (a.getMoney() < chosenGoodPrice) {
                 // find index of good
@@ -397,9 +398,6 @@ public class MarketMain {
                     }
                 }
 
-
-                // determine weight of the agent
-
                 continue;
             }
             // check if the gained satisfaction is not above the base threshold of keeping the money
@@ -417,21 +415,58 @@ public class MarketMain {
                 continue;
             }
             // finally, if the Agent can afford a good, the market can sell it, and it would obtain significant
-            // value from the purchase, complete the transaction
+            // value from the purchase...
+            // determine purchase quantity
+
+
+            // get total unmet need
+            double unmetNeedQuantity = 0;
+            // set desired quantity to 1, this will be modified if the agent is addressing unmet needs
+            double desiredQuantity = 1;
+            for (Map.Entry<String, Consumption> consumptionEntry : a.getConsumption().entrySet()) {
+                for (UnmetConsumption unmetConsumption : consumptionEntry.getValue().getUnmetNeeds()){
+                   unmetNeedQuantity += unmetConsumption.getMissingQuantity();
+                }
+            }
+            // if there are unmet needs, buy more than 1 unit
+            if (unmetNeedQuantity > 0){
+                // See how many of the good the Agent can afford to buy
+                double goodMaxQuantity = a.getMoney() / chosenGoodPrice;
+                double personalMaximum = Math.min(unmetNeedQuantity, goodMaxQuantity);
+                // get market inventory amount for sale
+                double amountForSale = m.getInventory().get(chosenGood);
+                // pick whichever the smallest
+                desiredQuantity = Math.min(personalMaximum, amountForSale);
+            }
+            // System.out.println(chosenGood + ", " + unmetNeedQuantity);
+            // System.out.println(chosenGood + ", " + m.getInventory().get(chosenGood));
+            double purchaseAmount = desiredQuantity;
+
             // deduct from Agent's money:
-            a.setMoney(a.getMoney() - chosenGoodPrice);
-            m.setMoney(m.getMoney() + chosenGoodPrice);
+            a.setMoney(a.getMoney() - chosenGoodPrice * desiredQuantity);
+            m.setMoney(m.getMoney() + chosenGoodPrice * desiredQuantity);
             // remove good from Market's inventory:
-            // can change purchase amount later
-            double purchaseAmount = 1;
+
             m.getInventory().put(chosenGood, m.getInventory().get(chosenGood) - purchaseAmount);
 
             // add good to Agent's inventory
-            a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + purchaseAmount);
+            // if there are unmet needs, address them first
+            double amountRemaining = purchaseAmount;
+            if (unmetNeedQuantity > 0){
+                for (Map.Entry<String, Consumption> consumptionEntry : a.getConsumption().entrySet()) {
+                    for (UnmetConsumption unmetConsumption : consumptionEntry.getValue().getUnmetNeeds()){
+                        if (amountRemaining > unmetConsumption.getMissingQuantity()){
+                            amountRemaining -= unmetConsumption.getMissingQuantity();
+                            unmetConsumption.setMissingQuantity(0);
 
-            // To Do : Fix Pricing!!!
-            // Problem: Agent can sell and not buy
-            // Fix method: remembering unmet consumption needs
+                        }
+                    }
+                }
+                a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + amountRemaining);
+            }
+            else{
+                a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + purchaseAmount);
+            }
 
             notPurchased = false;
             break;
