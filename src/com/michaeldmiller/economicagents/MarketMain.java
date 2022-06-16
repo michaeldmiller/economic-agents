@@ -144,6 +144,8 @@ public class MarketMain {
 
         // pay Agent
         agent.setMoney(agent.getMoney() + (producedQuantity * currentPrice));
+        // Market pays
+        market.setMoney(market.getMoney() - (producedQuantity * currentPrice));
         // send good to market
         market.getInventory().put(goodType, market.getInventory().get(goodType) + producedQuantity);
 
@@ -209,8 +211,9 @@ public class MarketMain {
                     }
                 }
             }
+
             // reset modifier if agent has successfully acquired a sufficient amount of the good
-            if (a.getInventory().get(agentConsumption.getKey()) >= 1){
+            if (a.getInventory().get(agentConsumption.getKey()) >= (1 - agentConsumption.getValue().getTickConsumption())){
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(agentConsumption.getKey())){
                         p.setModifier(1.0);
@@ -239,6 +242,8 @@ public class MarketMain {
             for (UnmetConsumption u : a.getConsumption().get(p.getGood()).getUnmetNeeds()){
                 totalUnmetNeed += u.getMissingQuantity();
             }
+            // reset total unmet need
+            a.getConsumption().get(p.getGood()).setTotalUnmetNeed(totalUnmetNeed);
             // set need ratio at 0.05 * (total unmet need / per tick consumption)
             double unmetNeedRatio = totalUnmetNeed / a.getConsumption().get(p.getGood()).getTickConsumption();
             // y = -1 * (1 / unmetNeedRatio * original elasticity inverse)
@@ -273,7 +278,11 @@ public class MarketMain {
             // set demand curve, maybe actually working this time
             // get price induced demand reduction/increase
             // negative * negative = positive; positive * negative = negative
-            double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
+
+            // currently, relative cost difference is always 0, making this useless
+            // double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
+
+            double priceElasticityOfDemand = currentMarketCost * p.getPriceElasticity();
 
             // add decreasing marginal utility
             double amountInInventory = a.getInventory().get(p.getGood());
@@ -294,9 +303,6 @@ public class MarketMain {
             if (p.getWeight() < 0){
                 p.setWeight(0);
             }
-
-            // if market inventory greater than 5 times current production of each good, reduce price of the good
-            // if agent tries to buy from market but can't, price goes up, relative to number of agents in the market
         }
     }
     public static void marketPriorities (Market m){
@@ -534,8 +540,13 @@ public class MarketMain {
                         break;
                     }
                 }
+                // SupplySum was adding one for every agent, regardless of profession!
+                if (a.getProfession().getJob().equals(jobType)){
+                    supplySum += a.getProfession().getPriceElasticityOfSupply();
+                    sumSupplyIntercept += 1;
+                }
 
-                supplySum = supplySum + a.getProfession().getPriceElasticityOfSupply();
+
                 // good minimum not dealt with, all production has 0 minimum across all Agents
 
                 // conditionally add to number of producers
@@ -562,6 +573,14 @@ public class MarketMain {
 
             // calculate intercept price
             // double goodPrice = (sumDemandIntercept - numOfProducers) / (0 - demandSum);
+            /*
+            System.out.println(p.getGood());
+            System.out.println("Supply slope sum : " + supplySum);
+            System.out.println("Demand slope sum : " + demandSum);
+            System.out.println(supplySum - demandSum);
+
+             */
+
             double goodPrice = (sumDemandIntercept - sumSupplyIntercept) / (supplySum - demandSum);
 
             p.setEquilibriumCost(goodPrice * p.getOriginalCost());
@@ -874,7 +893,7 @@ public class MarketMain {
                 // double consumptionVariance = 1 + random.nextGaussian(0.0,0.07);
                 double consumptionVariance = 1 + (0.07 * Math.random());
                 agentConsumption.put(marketInfo.getGood(), new Consumption(marketInfo.getBaseConsumption()
-                        * consumptionVariance, new ArrayList<UnmetConsumption>()));
+                        * consumptionVariance, 0, new ArrayList<UnmetConsumption>()));
                 // put 5 * base good consumption of good in agent's inventory
                 agentInventory.put(marketInfo.getGood(), 5 * marketInfo.getBaseConsumption());
                 // add good priority to agent with variance (standard deviation 2.5%)

@@ -84,8 +84,8 @@ public class Agent {
         return ("\n\n" + "ID: " + this.getId() + ",\n" +
                 "Inventory: " + this.getInventory() + ",\n" +
                 "Priorities: " + this.getPriorities() + ",\n" +
-                "com.michaeldmiller.economicagents.Consumption: " + this.getConsumption() + ",\n" +
-                "com.michaeldmiller.economicagents.Profession: " + this.getProfession() + ",\n" +
+                "Consumption: " + this.getConsumption() + ",\n" +
+                "Profession: " + this.getProfession() + ",\n" +
                 "Money: " + this.getMoney() + ",\n" +
                 "Satisfaction: " + this.getSatisfaction() + ".");
     }

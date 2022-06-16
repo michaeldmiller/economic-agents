@@ -46,8 +46,9 @@ public class Price {
 
     public String toString() {
         return ("\n" + this.getGood() + ", " +
-                "Cost: " + this.getCost() + ", " +
-                "Equilibrium Cost: " + this.getEquilibriumCost() + ", " +
-                "Original Cost: " + this.getOriginalCost());
+                "Cost: " + (Math.round(this.getCost()))
+                // + ", " + "Equilibrium Cost: " + this.getEquilibriumCost() + ", " +
+                // "Original Cost: " + this.getOriginalCost()
+        );
     }
 }

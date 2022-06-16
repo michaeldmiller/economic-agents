@@ -2,9 +2,10 @@ package com.michaeldmiller.economicagents;
 
 import java.util.ArrayList;
 
-// A 'Consumptions' is a HashMap of com.michaeldmiller.economicagents.Consumption
+// A 'Consumptions' is a HashMap of Consumption
 public class Consumption {
     private double tickConsumption;
+    private double totalUnmetNeed;
     private ArrayList<UnmetConsumption> unmetNeeds;
     /*
     private double status;
@@ -14,10 +15,11 @@ public class Consumption {
     private double intercept;
     */
 
-    public Consumption(double tickConsumption, ArrayList<UnmetConsumption> unmetNeeds
+    public Consumption(double tickConsumption, double totalUnmetNeed, ArrayList<UnmetConsumption> unmetNeeds
                        //, double status, double slope, double offset, double intercept
     ) {
         this.tickConsumption = tickConsumption;
+        this.totalUnmetNeed = totalUnmetNeed;
         this.unmetNeeds = unmetNeeds;
         /*
         this.status = status;
@@ -29,6 +31,9 @@ public class Consumption {
 
     public double getTickConsumption() {
         return tickConsumption;
+    }
+    public double getTotalUnmetNeed(){
+        return totalUnmetNeed;
     }
 
     public ArrayList<UnmetConsumption> getUnmetNeeds() {
@@ -52,6 +57,9 @@ public class Consumption {
     public void setTickConsumption(double newTickConsumption) {
         tickConsumption = newTickConsumption;
     }
+    public void setTotalUnmetNeed(double newTotalUnmetNeed){
+        totalUnmetNeed = newTotalUnmetNeed;
+    }
 
     public void setUnmetNeeds(ArrayList<UnmetConsumption> newUnmetNeeds) {
         unmetNeeds = newUnmetNeeds;
@@ -72,7 +80,8 @@ public class Consumption {
     }
     */
     public String toString() {
-        return ("Tick com.michaeldmiller.economicagents.Consumption: " + this.getTickConsumption() + ", " +
+        return ("Tick Consumption: " + this.getTickConsumption() + ", " +
+                "Total Unmet Need: " + this.getTotalUnmetNeed() + ", " +
                 "Unmet Needs: " + this.getUnmetNeeds()
                 /*
                 + ", " + "Socioeconomic Status: " + this.getStatus() + ", " +
