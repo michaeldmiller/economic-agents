@@ -171,30 +171,8 @@ public class MarketMain {
     public static void agentConsume (Agent a, Market m){
         for (Map.Entry<String, Consumption> agentConsumption: a.getConsumption().entrySet()){
             // handle unmet needs, if they exist
-            for (int i = 0; i < a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().size(); i++){
-                UnmetConsumption u = a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().get(i);
-                u.setTicksPassed(u.getTicksPassed() + 1);
+            // unmet need cap would go here if implemented
 
-                // 0.5.6 stop forgetting past needs
-                /*
-                // simulate forgetting past unmet needs
-                // if memory is 50 ticks old, begin reducing quantity
-                if (u.getTicksPassed() >= 50){
-                    u.setMissingQuantity(u.getMissingQuantity() - 0.01);
-                }
-
-                // if memory is more than 100 ticks old, reduce faster
-                if (u.getTicksPassed() >= 100){
-                    u.setMissingQuantity(u.getMissingQuantity() - 0.04);
-                }
-
-                 */
-
-                // remove memory if quantity dips to or below 0
-                if (u.getMissingQuantity() <= 0) {
-                    a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds().remove(u);
-                }
-            }
 
             double currentInventoryAmount = a.getInventory().get(agentConsumption.getKey());
             double newInventoryAmount = currentInventoryAmount - agentConsumption.getValue().getTickConsumption();
@@ -206,9 +184,9 @@ public class MarketMain {
                 double shortage = currentInventoryAmount - newInventoryAmount;
                 // prevent rounding error shortages from being counted
                 if (Math.abs(shortage) > 0.01){
-                    // add new unmet need to corresponding entry in agent's consumptions
-                    a.getConsumption().get(agentConsumption.getKey()).getUnmetNeeds()
-                            .add(new UnmetConsumption(0, shortage));
+                    // add value to total unmet need for agent
+                    a.getConsumption().get(agentConsumption.getKey()).setTotalUnmetNeed(
+                            a.getConsumption().get(agentConsumption.getKey()).getTotalUnmetNeed() + shortage);
 
                 }
                 a.getInventory().put(agentConsumption.getKey(), 0.0);
@@ -246,13 +224,9 @@ public class MarketMain {
         // calculate current relative demand based on elasticity
         for (Priority p : a.getPriorities()){
             // change demand elasticity based on sum of remembered unmet consumption
-            double totalUnmetNeed = 0;
-            for (UnmetConsumption u : a.getConsumption().get(p.getGood()).getUnmetNeeds()){
-                totalUnmetNeed += u.getMissingQuantity();
-            }
-            // reset total unmet need
-            a.getConsumption().get(p.getGood()).setTotalUnmetNeed(totalUnmetNeed);
-            // set need ratio at 0.05 * (total unmet need / per tick consumption)
+            double totalUnmetNeed = a.getConsumption().get(p.getGood()).getTotalUnmetNeed();
+
+            // set need ratio at (total unmet need / per tick consumption)
             double unmetNeedRatio = totalUnmetNeed / a.getConsumption().get(p.getGood()).getTickConsumption();
             // y = -1 * (1 / unmetNeedRatio * original elasticity inverse)
             // (sets decay with y intercept at original elasticity)
@@ -287,9 +261,9 @@ public class MarketMain {
             // negative * negative = positive; positive * negative = negative
 
             // currently, relative cost difference is always 0, making this useless
-            double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
+            // double priceElasticityOfDemand = relativeCostDifference * p.getPriceElasticity();
 
-            // double priceElasticityOfDemand = currentMarketCost * p.getPriceElasticity();
+            double priceElasticityOfDemand = currentMarketCost * p.getPriceElasticity();
 
             // add decreasing marginal utility
             double amountInInventory = a.getInventory().get(p.getGood());
@@ -442,14 +416,10 @@ public class MarketMain {
 
 
             // get total unmet need
-            double unmetNeedQuantity = 0;
+            double unmetNeedQuantity = a.getConsumption().get(chosenGood).getTotalUnmetNeed();
             // set desired quantity to 1, this will be modified if the agent is addressing unmet needs
             double desiredQuantity = 1;
-            for (Map.Entry<String, Consumption> consumptionEntry : a.getConsumption().entrySet()) {
-                for (UnmetConsumption unmetConsumption : consumptionEntry.getValue().getUnmetNeeds()){
-                   unmetNeedQuantity += unmetConsumption.getMissingQuantity();
-                }
-            }
+
             // if there are unmet needs, buy more than 1 unit
             if (unmetNeedQuantity > 0){
                 // See how many of the good the Agent can afford to buy
@@ -479,56 +449,27 @@ public class MarketMain {
             double amountRemoved = 0;
             double amountRemaining = purchaseAmount;
             if (unmetNeedQuantity > 0){
-                for (Map.Entry<String, Consumption> consumptionEntry : a.getConsumption().entrySet()) {
-
-                    if (consumptionEntry.getKey().equals(chosenGood)){
-                        for (int i = 0; i < consumptionEntry.getValue().getUnmetNeeds().size(); i++){
-                            UnmetConsumption unmetConsumption = consumptionEntry.getValue().getUnmetNeeds().get(i);
-                            if (amountRemaining > unmetConsumption.getMissingQuantity()){
-                                //System.out.println("unmetConsumption is: " + unmetConsumption);
-                                amountRemaining -= unmetConsumption.getMissingQuantity();
-                                amountRemoved += unmetConsumption.getMissingQuantity();
-                                //System.out.println("unmetConsumption is now: " + unmetConsumption);
-                                //System.out.println("Removed an unmet need for " + consumptionEntry.getKey());
-                                //System.out.println("Good was: " + chosenGood);
-                                consumptionEntry.getValue().getUnmetNeeds().remove(i);
-                                //System.out.println("Removed " + i);
-
-                            }
-                        }
-
-                        /*
-                        // Old version
-                        // Fixed bug 0.5.6, was attempting to remove unmet needs for /all/ goods, not just the one
-                        // it was supposed to be buying. Fixed by the line above this comment
-                        for (UnmetConsumption unmetConsumption : consumptionEntry.getValue().getUnmetNeeds()){
-                            if (amountRemaining > unmetConsumption.getMissingQuantity()){
-                                //System.out.println("unmetConsumption is: " + unmetConsumption);
-                                amountRemaining -= unmetConsumption.getMissingQuantity();
-                                amountRemoved += unmetConsumption.getMissingQuantity();
-                                unmetConsumption.setMissingQuantity(-0.01);
-                                //System.out.println("unmetConsumption is now: " + unmetConsumption);
-                                //System.out.println("Removed an unmet need for " + consumptionEntry.getKey());
-                                //System.out.println("Good was: " + chosenGood);
-
-                            }
-                        }
-                        // ensure empty consumptions are removed
-                        for (int i = 0; i < consumptionEntry.getValue().getUnmetNeeds().size(); i++){
-                            if (consumptionEntry.getValue().getUnmetNeeds().get(i).getMissingQuantity() <= 0){
-                                consumptionEntry.getValue().getUnmetNeeds().remove(i);
-                                //System.out.println("Removed " + i);
-                            }
-                        }
-
-                         */
-                    }
+                // System.out.println(unmetNeedQuantity);
+                if (unmetNeedQuantity >= amountRemaining) {
+                    // if agent needs more than it bought, remove total purchased amount from unmet needs
+                    a.getConsumption().get(chosenGood).setTotalUnmetNeed(
+                            a.getConsumption().get(chosenGood).getTotalUnmetNeed() - amountRemaining);
+                    amountRemaining = 0;
                 }
+                else{
+                    // otherwise, agent purchased more than their total unmet need, so set the total unmet need
+                    // to 0 and set the remainder as the amountRemaining
+                    System.out.println(a.getConsumption().get(chosenGood));
+                    amountRemaining -= a.getConsumption().get(chosenGood).getTotalUnmetNeed();
+                    a.getConsumption().get(chosenGood).setTotalUnmetNeed(0);
+                }
+
                 a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + amountRemaining);
+                // System.out.println("Purchased " + purchaseAmount + ", Amount Remaining is: " + amountRemaining);
                 //System.out.println("Removed " + amountRemoved + "Kept " + amountRemaining + "Purchased " + purchaseAmount);
             }
-
             else{
+                // if there are no unmet needs, send straight to inventory
                 a.getInventory().put(chosenGood, a.getInventory().get(chosenGood) + purchaseAmount);
             }
 
@@ -588,15 +529,7 @@ public class MarketMain {
                     if (c.getKey().equals(p.getGood())) {
                         sumDemandIntercept += (c.getValue().getTickConsumption() * 10);
 
-                        /*
                         // also add sum of agent's unmet needs
-                        double sumUnmetNeeds = 0;
-                        for (UnmetConsumption u : c.getValue().getUnmetNeeds()){
-                            sumUnmetNeeds += u.getMissingQuantity();
-                        }
-                        sumDemandIntercept += sumUnmetNeeds;
-
-                         */
 
                         break;
                     }
@@ -841,7 +774,7 @@ public class MarketMain {
 
         // reintroduce old system for profit seeking behavior
         for (Agent a : market.getAgents()){
-            if (Math.random() < 0.2){
+            if (Math.random() < 0.01){
                 // determine agent's good
                 String agentGood = "";
                 for (JobOutput j : market.getJobOutputs()){
