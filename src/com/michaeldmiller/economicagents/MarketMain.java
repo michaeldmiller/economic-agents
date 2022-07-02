@@ -791,9 +791,20 @@ public class MarketMain {
                         break;
                     }
                 }
+                // determine actual output
+                double agentProductionCurrentValue = agentEquilibriumPrice *
+                        a.getProfession().getBaseProduction() * a.getProfession().getSkillLevel();
+                double newGoodBaseProduction = 0;
                 // see if any other goods are more profitable
                 for (Price r : market.getPrices()){
-                    if (r.getCost() > agentEquilibriumPrice){
+                    for (MarketInfo marketInfo : market.getMarketProfile()){
+                        if (marketInfo.getGood().equals(r.getGood())){
+                            newGoodBaseProduction = marketInfo.getBaseProduction();
+                        }
+                    }
+                    // need to add skill level query for future agent skill set
+                    double newGoodProductionValue = r.getCost() * newGoodBaseProduction;
+                    if (newGoodProductionValue > agentProductionCurrentValue){
                         // if so, 10% chance to switch to that profession, 1% chance per agent per tick overall
                         if (Math.random() < 0.1){
                             // find matching profession, set agent's profession
