@@ -173,7 +173,6 @@ public class MarketMain {
             // handle unmet needs, if they exist
             // unmet need cap would go here if implemented
 
-
             double currentInventoryAmount = a.getInventory().get(agentConsumption.getKey());
             double newInventoryAmount = currentInventoryAmount - agentConsumption.getValue().getTickConsumption();
 
@@ -193,10 +192,17 @@ public class MarketMain {
                 for (Priority p : a.getPriorities()){
                     if (p.getGood().equals(agentConsumption.getKey())){
                         // add cumulative need effect
-                        p.setModifier(p.getRelativeNeed() * 1.5 + (0.1 * p.getModifier()));
+                        // p.setModifier(p.getRelativeNeed() * 1.5 + (0.1 * p.getModifier()));
                     }
                 }
             }
+            // since there have been significant changes to inventory and unmet needs since the weight system was
+            // last updated, need to begin including unmet need total in weighting calculation
+            // add unmet need total to modifier
+            for (Priority p : a.getPriorities()){
+                p.setModifier(a.getConsumption().get(p.getGood()).getTotalUnmetNeed());
+            }
+
 
             // reset modifier if agent has successfully acquired a sufficient amount of the good
             if (a.getInventory().get(agentConsumption.getKey()) >= (1 - agentConsumption.getValue().getTickConsumption())){
@@ -270,14 +276,15 @@ public class MarketMain {
             double decreasingMarginalUtility = 1;
             if (amountInInventory > (5 * consumedQuantity)){
                 decreasingMarginalUtility = (((amountInInventory - (5 * consumedQuantity))
-                        / (5 * consumedQuantity)) * -100);
+                        / (5 * consumedQuantity)) * -1);
             }
 
             p.setRelativeNeed((consumedQuantity * 100) * (1 + (priceElasticityOfDemand / 100))
-                                                        * (1 + (decreasingMarginalUtility / 100)));
+                                                        * (1 + decreasingMarginalUtility));
 
             // set final weight
             // adding modifier prevents price aversion from overwhelming need to buy something
+
             p.setWeight((p.getBaseWeight() * p.getRelativeNeed()) + p.getModifier());
 
             // set negative weight to 0
@@ -524,13 +531,26 @@ public class MarketMain {
                         demandSum = demandSum + r.getPriceElasticity();
                     }
                 }
+                // Change 0.5.9: intercept includes unmet need
                 // add demand intercept to sum
+
                 for (Map.Entry<String, Consumption> c : a.getConsumption().entrySet()) {
                     if (c.getKey().equals(p.getGood())) {
+                        // add base demand
                         sumDemandIntercept += (c.getValue().getTickConsumption() * 10);
+                        // also add sum of agent's unmet needs or maximum money, whichever is smaller
+                        // cap agents unmet needs at 100 * per tick consumption, to prevent runaway inflation
 
-                        // also add sum of agent's unmet needs
+                        // double maximumUnmetGoodNeed = c.getValue().getTotalUnmetNeed();
+                        // maximumUnmetGoodNeed = Math.min(maximumUnmetGoodNeed, c.getValue().getTickConsumption() * 100);
 
+                        // double totalMoney = a.getMoney();
+                        // sumDemandIntercept += Math.min(maximumUnmetGoodNeed, totalMoney);
+
+                        // scale demand by square root of unmet needs (to prevent extreme runaway inflation)
+                        double maximumUnmetGoodNeed = Math.sqrt(c.getValue().getTotalUnmetNeed());
+
+                        sumDemandIntercept += maximumUnmetGoodNeed;
                         break;
                     }
                 }
@@ -833,6 +853,58 @@ public class MarketMain {
                 }
             }
         }
+        // discarded fix: market aware profit
+        // need market-aware profit. Not a forced equilibrium, but agents need to be able to seek profit, not just
+        // react to it. Current behavior creates overproduction. Demand increases in response to unmet need
+
+        /*
+        // switch chance by production satisfaction
+        for (Agent a : market.getAgents()){
+            if (a.getSatisfaction() < 0){
+                // if so, get percent chance to switch
+                // derived from square root of absolute value of satisfaction
+                double baseChance = Math.sqrt(Math.abs(a.getSatisfaction()));
+                // set threshold: if Agent does not have at least 25 unhappiness, no chance of switching
+                if (baseChance < 5){
+                    baseChance = 0;
+                }
+                // generate random number, pair with base chance, have agent switch professions if true
+                // should be 100, offset by base 1/100 chance, i.e. 10000
+                if ((Math.random() * 10000) < baseChance) {
+                    // Agent attempts to switch into a new profession
+                    // make agent prioritise underutilized profession, make random weighted choice based on
+                    // the size of the production deficit
+                    ArrayList<String> goodChoices = new ArrayList<>();
+                    for (MarketInfo marketInfo : market.getMarketProfile()) {
+                        goodChoices.add(marketInfo.getGood());
+                    }
+                    // make simple random choice for new profession
+                    String professionGoodChoice = randomPick(goodChoices);
+                    // match good with profession and set
+                    // find matching profession, set agent's profession
+                    for (JobOutput o : market.getJobOutputs()) {
+                        if (o.getGood().equals(professionGoodChoice)) {
+                            double priceElasticityOfSupply = 0;
+                            double production = 0;
+                            for (MarketInfo marketInfo : market.getMarketProfile()) {
+                                if (marketInfo.getGood().equals(o.getGood())) {
+                                    priceElasticityOfSupply = marketInfo.getPriceElasticitySupply();
+                                    production = marketInfo.getBaseProduction();
+                                }
+                            }
+                            //System.out.println("Production Value (Profit)" + production);
+
+                            a.setProfession((new Profession(o.getJob(), 1.0,
+                                    production, 1.0, priceElasticityOfSupply)));
+                            // reset agent satisfaction
+                            a.setSatisfaction(0.0);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        */
 
     }
 
